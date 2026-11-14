@@ -28,10 +28,12 @@ let lastLayout = '';
 function fitBoard() {
   const style = getComputedStyle(board);
   const width = board.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-  const signature = `${g.mode}:${width}`;
+  const boardTop = board.getBoundingClientRect().top + window.scrollY;
+  const availableHeight = window.innerHeight - boardTop - 50;
+  const signature = `${g.mode}:${width}:${availableHeight}`;
   if (signature === lastLayout || width <= 0) return;
   lastLayout = signature;
-  const layout = boardLayout(g.mode, width);
+  const layout = boardLayout(g.mode, width, availableHeight);
   for (const [name,value] of Object.entries({ 'card-w':layout.cardWidth, 'layout-gap':layout.gap, 'face-step':layout.faceStep, 'back-step':layout.backStep })) {
     board.style.setProperty(`--${name}`, `${value}px`);
   }
@@ -186,8 +188,9 @@ $('hint').onclick = () => {
   render();
 };
 $('rules').onclick = () => $('rules-dialog').showModal();
+$('settings-open').onclick = () => $('settings-dialog').showModal();
 document.addEventListener('keydown', e => {
-  if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName) || $('rules-dialog').open) return;
+  if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName) || $('rules-dialog').open || $('settings-dialog').open) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(e.shiftKey); }
   if (e.key === 'Escape') { selected = null; notice = ''; render(); }
   if (e.key.toLowerCase() === 'a' && selected) { e.preventDefault(); choose(selected,true); }

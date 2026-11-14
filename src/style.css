@@ -27,3 +27,16 @@
   .back-medallion{font-size:clamp(18px,5vw,30px)}
 }
 @media(max-width:720px){.table-settings select{font-size:16px}}
+/* Keep the table central; secondary preferences live in the settings dialog. */
+.room{max-width:1720px}.topbar{gap:16px}main{padding-top:16px}#board,#modes,.difficulty-note,footer{max-width:1480px}#settings-dialog .table-settings{align-items:start}#settings-dialog .difficulty-label{flex:1;min-width:0}#settings-dialog select{width:100%;min-width:0;font-size:16px}
+@media(max-width:720px){
+  .topbar{min-height:0;padding:6px 10px;gap:4px;align-items:center}
+  .brand{gap:0}.brand-mark,.brand-name small{display:none}.brand-name{font-size:17px}
+  .stats{gap:12px;order:0;width:auto;justify-content:initial}.stat{min-width:35px}.stat small{font-size:7px}.stat b{font-size:13px}
+  .toolbar{flex:0 0 100%;justify-content:space-between;gap:2px}
+  .tool-button{width:34px;height:38px;font-size:8px}.tool-button svg{width:16px;height:16px}
+  .toolbar .primary{padding:0 8px;height:36px;font-size:11px}.toolbar .primary svg{display:none}
+  main{padding:6px 6px 12px}#modes{padding:0;margin:0 0 7px}#modes button{padding:7px 3px;font-size:12px}
+  #difficulty-note{display:none}#board{padding:12px 8px 20px;min-height:calc(100svh - 170px)}
+  footer{margin-top:7px;min-height:24px;font-size:11px}
+}
