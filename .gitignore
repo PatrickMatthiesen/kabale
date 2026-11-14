@@ -1,0 +1,12 @@
+# Generated source images and unused concept explorations stay local.
+# Runtime JPEG sheets and generation prompts are versioned.
+assets/concepts/
+assets/cards/*.png
+assets/cards/full/*.png
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db

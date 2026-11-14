@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#15382e"><title>Kabale | A little room for cards</title><link rel="stylesheet" href="src/style.css"></head>
+<body><div class="room">
+<header class="topbar"><a class="brand" href="#" aria-label="Kabale home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 44 44"><path d="M22 4 40 14v16L22 40 4 30V14z"/><path d="m24 10-11 13h8l-2 11 12-15h-8z"/></svg></span><span class="brand-name">Kabale<small>A little room for cards</small></span></a>
+<div class="stats" aria-label="Game statistics"><span class="stat"><small>TIME</small><b id="time">00:00</b></span><span class="stat"><small>MOVES</small><b id="moves">0</b></span></div>
+<div class="toolbar">
+<button id="undo" class="tool-button" type="button" title="Undo last move" aria-label="Undo last move"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M5 9h8a7 7 0 0 1 0 14h-1"/></svg><span>Undo</span></button>
+<button id="redo" class="tool-button" type="button" title="Redo move" aria-label="Redo move"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5m4 5h-8a7 7 0 0 0 0 14h1"/></svg><span>Redo</span></button>
+<button id="hint" class="tool-button" type="button" title="Show a hint" aria-label="Show a hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6m-5 4h4m-3-21a7 7 0 0 0-4 13c1 .7 1.5 1.5 1.5 2h5c0-.5.5-1.3 1.5-2A7 7 0 0 0 11 1Z"/></svg><span>Hint</span></button>
+<button id="rules" class="tool-button" type="button" title="How to play" aria-label="How to play"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.4 2.4 0 1 1 4 1.8c-1.2.9-1.7 1.3-1.7 2.7m0 3v.1"/></svg><span>Rules</span></button>
+<button id="restart" class="tool-button" type="button" title="Restart this deal" aria-label="Restart this deal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7v5h5M5 12a8 8 0 1 0 2-6"/></svg><span>Restart</span></button>
+<button id="new" class="primary" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"/></svg><span>New deal</span></button></div></header>
+<main><section class="game-heading" aria-label="Game setup"><div><p class="eyebrow">THE CARD TABLE</p><h1>Take your time.</h1><p class="subtitle">A fresh shuffle, whenever you need one.</p></div><div class="table-settings"><label class="difficulty-label" for="card-art"><span>Card art</span><select id="card-art" aria-describedby="art-note"><option value="engraved">Engraved</option><option value="woodcut">Woodcut</option><option value="random">Random Deck</option></select><small id="art-note" aria-live="polite"></small></label><label class="difficulty-label" for="difficulty"><span>Challenge</span><select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label></div></section>
+<nav id="modes" aria-label="Choose a solitaire game"></nav><p id="difficulty-note" class="difficulty-note"></p><section id="board" aria-label="Solitaire card table"></section>
+<footer><span id="message" role="status" aria-live="polite">Choose a card, then its destination.</span><span class="footer-note">Double-click to move · A for auto-move</span></footer>
+</main></div>
+<dialog id="rules-dialog" aria-labelledby="rules-title"><form method="dialog" class="dialog-card"><button class="dialog-close" aria-label="Close rules">×</button><p class="eyebrow">A NOTE AT THE TABLE</p><h2 id="rules-title">How to play</h2><p>Choose a game and challenge, then move cards by selecting a card and its destination. Double-click or double-tap a card to move it automatically when a legal move is available.</p><p>Press A with a card selected to move it automatically. Use Ctrl+Z to undo and Ctrl+Shift+Z to redo. Hard disables undo, redo and hints. Restart deals the same cards again; New deal shuffles a fresh game. Your current game is saved on this device.</p><p id="rule-summary" class="rules-copy"></p><button class="primary dialog-done">Back to the cards</button></form></dialog>
+<script type="module" src="src/app.js"></script></body></html>
+
+
+
+
