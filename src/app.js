@@ -2,6 +2,7 @@ import { deal, applyMove, autoMove, legalMoves, pyramidPlayable } from './engine
 import { loadArt, saveArt, resolveArt, cardFace, getStorage } from './card-art.js';
 import { wasteLayout } from './waste-layout.js';
 import { hintRole as getHintRole } from './hints.js';
+import { boardLayout } from './board-layout.js';
 
 const storage = getStorage(window);
 const art = loadArt(storage);
@@ -23,6 +24,20 @@ try {
   }
 } catch { notice = 'Your saved game could not be loaded. A fresh table is ready.'; }
 const board = $('board');
+let lastLayout = '';
+function fitBoard() {
+  const style = getComputedStyle(board);
+  const width = board.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const signature = `${g.mode}:${width}`;
+  if (signature === lastLayout || width <= 0) return;
+  lastLayout = signature;
+  const layout = boardLayout(g.mode, width);
+  for (const [name,value] of Object.entries({ 'card-w':layout.cardWidth, 'layout-gap':layout.gap, 'face-step':layout.faceStep, 'back-step':layout.backStep })) {
+    board.style.setProperty(`--${name}`, `${value}px`);
+  }
+}
+new ResizeObserver(fitBoard).observe(board);
+window.addEventListener('resize', fitBoard);
 const rank = c => ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'][c.r];
 const suitNames = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs' };
 const clock = () => elapsed + (g.won ? 0 : Date.now() - resumedAt);
@@ -101,6 +116,7 @@ function render() {
     html += '</div><div class="row tableau">' + g.cols.map(tableau).join('') + '</div>';
   }
   board.dataset.mode = g.mode;
+  fitBoard();
   board.innerHTML = html;
   $('message').textContent = g.won ? 'The table is cleared. Well played.' : notice || (selected ? 'Choose a destination. Escape cancels your selection.' : 'Double-click a card to move it automatically.');
   if (focusKey) board.querySelector(`button[data-key="${focusKey}"]:not(:disabled)`)?.focus({preventScroll:true});
