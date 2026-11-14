@@ -16,7 +16,7 @@ test('every rank and suit maps to a unique complete face in both decks', () => {
     const faces = new Set();
     for (const s of ['♣','♠','♥','♦']) for (let r=1;r<=13;r++) {
       const face=cardFace({r,s},style);
-      assert.ok(existsSync(new URL(`..${face.url}`, import.meta.url)));
+      assert.ok(existsSync(new URL(`../${face.url}`, import.meta.url)));
       faces.add(face.url+face.position);
     }
     assert.equal(faces.size,52);
@@ -24,8 +24,13 @@ test('every rank and suit maps to a unique complete face in both decks', () => {
 });
 
 test('sprite coordinates retain complete edge faces, including ten and king', () => {
-  assert.deepEqual(cardFace({r:10,s:'♥'},'woodcut'), {url:'/assets/cards/full/woodcut-hearts-numbers.jpg',size:'500% 200%',position:'100% 100%'});
-  assert.deepEqual(cardFace({r:13,s:'♠'},'engraved'), {url:'/assets/cards/full/engraved-spades-court.jpg',size:'300% 100%',position:'100% 0%'});
+  assert.deepEqual(cardFace({r:10,s:'♥'},'woodcut'), {url:'./assets/cards/full/woodcut-hearts-numbers.jpg',size:'500% 200%',position:'100% 100%'});
+  assert.deepEqual(cardFace({r:13,s:'♠'},'engraved'), {url:'./assets/cards/full/engraved-spades-court.jpg',size:'300% 100%',position:'100% 0%'});
+});
+
+test('card artwork resolves inside the GitHub Pages repository path', () => {
+  const face=cardFace({r:1,s:'♠'},'engraved');
+  assert.equal(new URL(face.url,'https://patrickmatthiesen.github.io/kabale/').pathname,'/kabale/assets/cards/full/engraved-spades-numbers.jpg');
 });
 
 test('selected styles stay fixed; random can choose either approved style', () => {
@@ -52,4 +57,3 @@ test('fixed preference ignores stale resolved art and invalid storage falls back
   assert.deepEqual(loadArt({ getItem: () => '{bad' }), {choice:'engraved',resolved:'engraved'});
   assert.doesNotThrow(() => saveArt({ setItem() { throw Error('Unavailable'); } }, {choice:'woodcut',resolved:'woodcut'}));
 });
-

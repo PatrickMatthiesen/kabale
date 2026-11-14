@@ -2,6 +2,8 @@
 
 A browser solitaire game with 7-kabale (Klondike), Spider, FreeCell, and Pyramid.
 
+Play at https://patrickmatthiesen.github.io/kabale/.
+
 ## Run locally
 
 Install Node.js 22 or newer, then run:
@@ -15,6 +17,10 @@ Open http://localhost:5187. The development server listens on the local machine 
 ```sh
 npm test
 ```
+
+## GitHub Pages
+
+Pushes to `main` run the tests, assemble `_site` with `npm run build`, and deploy it to GitHub Pages. The site uses relative asset paths so it also works below the repository's `/kabale/` path. Only the game files and runtime JPEG artwork are published; the development server is not needed in production.
 
 ## Playing
 

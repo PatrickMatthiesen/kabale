@@ -1,1 +1,1 @@
-{"name":"kabale","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"node server.js","test":"node --test"}}
+{"name":"kabale","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"node server.js","test":"node --test","build":"node scripts/build-pages.js"}}

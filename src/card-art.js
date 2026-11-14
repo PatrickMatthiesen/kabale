@@ -16,7 +16,7 @@ export function cardFace(card, style) {
   const columns = court ? 3 : 5;
   const rows = court ? 1 : 2;
   return {
-    url: `/assets/cards/full/${style}-${suits[card.s]}-${court ? 'court' : 'numbers'}.jpg`,
+    url: `./assets/cards/full/${style}-${suits[card.s]}-${court ? 'court' : 'numbers'}.jpg`,
     size: `${columns * 100}% ${rows * 100}%`,
     position: `${(index % columns) * 100 / (columns - 1)}% ${rows === 1 ? 0 : Math.floor(index / columns) * 100}%`
   };

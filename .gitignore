@@ -4,6 +4,7 @@ assets/concepts/
 assets/cards/*.png
 assets/cards/full/*.png
 node_modules/
+_site/
 .env
 .env.*
 !.env.example
