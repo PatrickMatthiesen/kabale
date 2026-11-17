@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const source = await readFile(new URL('../src/card-drag.js', import.meta.url), 'utf8');
 
-function harness() {
+function harness({ moves = [{from:'waste:0',to:'col:0'}], disabled = false, sourceKey = 'waste:0' } = {}) {
   const windowHandlers = new Map();
   const boardHandlers = new Map();
   const bodyClasses = new Set();
@@ -35,7 +35,8 @@ function harness() {
     Object.defineProperty(el,'className',{set(value){this.classList.owner=new Set(value.split(/\s+/).filter(Boolean));}});
     return el;
   }
-  const card=element('waste:0');
+  const card=element(sourceKey);
+  card.disabled=disabled;
   const destination=element('col:0');
   let underPointer=card;
   const board={
@@ -56,7 +57,7 @@ function harness() {
   vm.runInNewContext(source.replace('export function attachCardDrag','function attachCardDrag')+';globalThis.attachCardDrag=attachCardDrag;',context);
   const events=[];
   const drag=context.attachCardDrag(board,{
-    getMoves:()=>[{from:'waste:0',to:'col:0'}],
+    getMoves:()=>moves,
     onStart:()=>events.push('start'),
     onDrop:(from,to)=>events.push(['drop',from,to]),
     onCancel:()=>events.push('cancel')
@@ -105,4 +106,35 @@ test('a touch tap below the drag threshold does not start a drag',()=>{
   assert.deepEqual(h.events,[]);
 });
 
+test('a card with no legal destination can be lifted without markers and returns on release',()=>{
+  const h=harness({moves:[]});
+  h.move(30,30);
+  assert.deepEqual(h.events,['start']);
+  assert.equal(h.card.classList.contains('drag-source'),true);
+  assert.equal(h.bodyClasses.has('dragging-cards'),true);
+  assert.equal(h.destination.classList.contains('drop-target'),false);
+  assert.equal(h.destination.classList.contains('drop-hover'),false);
+  h.up();
+  assert.deepEqual(h.events,['start',['drop','waste:0',null]]);
+  assert.equal(h.card.classList.contains('drag-source'),false);
+  assert.equal(h.bodyClasses.has('dragging-cards'),false);
+  assert.equal(h.capture.has(7),false);
+});
+
+test('a card without legal destinations still treats a short touch as a tap',()=>{
+  const h=harness({moves:[]});
+  h.move(24,24);
+  h.up(24,24);
+  assert.deepEqual(h.events,[]);
+});
+
+test('face-down or covered cards and the stock cannot be picked up',()=>{
+  for (const options of [{disabled:true},{sourceKey:'stock'}]) {
+    const h=harness({...options,moves:[]});
+    h.move(30,30);
+    h.up();
+    assert.deepEqual(h.events,[]);
+    assert.equal(h.bodyClasses.has('dragging-cards'),false);
+  }
+});
 

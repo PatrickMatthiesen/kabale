@@ -222,11 +222,11 @@ cardDrag = attachCardDrag(board, {
   onStart: () => {
     hint=null; selected=null; lastClick={key:'',time:0};
     board.querySelectorAll('.hinted,.hint-source,.hint-destination,.selected').forEach(el=>el.classList.remove('hinted','hint-source','hint-destination','selected'));
-    $('message').textContent='Drop onto a highlighted destination. Escape cancels.';
+    $('message').textContent='Release to place the card. Escape cancels.';
   },
   onDrop: (from,to) => {
     if (to) action(()=>applyMove(g,from,to));
-    else { notice='Move cancelled. Drop onto a highlighted destination.'; render(); }
+    else { notice='Card returned to its original position.'; render(); }
   },
   onCancel: () => { notice='Move cancelled.'; $('message').textContent=notice; }
 });

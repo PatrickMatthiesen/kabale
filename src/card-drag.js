@@ -81,7 +81,8 @@ export function attachCardDrag(board, { getMoves, onStart, onDrop, onCancel }) {
     if (!element || element.disabled || element.dataset.key==='stock') return;
     const from=element.dataset.key;
     const targets=new Set(getMoves().filter(move=>move.from===from).map(move=>canonicalTarget(move.to)));
-    if (!targets.size) return;
+    // Picking a card up is independent of whether it has a legal destination.
+    // An empty target set still allows a preview, then returns the card on drop.
     const rect=element.getBoundingClientRect();
     gesture={id:event.pointerId,element,from,targets,x:event.clientX,y:event.clientY,offsetX:event.clientX-rect.left,offsetY:event.clientY-rect.top};
   });
