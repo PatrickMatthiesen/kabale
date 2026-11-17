@@ -27,12 +27,13 @@ test('mobile card width remains determined by columns, even in a short viewport'
   assert.equal(boardLayout('spider',354,200).cardWidth,boardLayout('spider',354,900).cardWidth);
 });
 
-test('narrow Spider stacks expose complete rank and suit labels without horizontal overflow', () => {
-  for (const width of [260,274,300,336,354,390]) {
-    const layout = boardLayout('spider',width);
-    const indexSize=Math.min(layout.cardWidth*.46,Math.max(12,Math.min(28,layout.cardWidth*.4)));
+test('phone and desktop stacks expose the complete fluid rank and suit labels', () => {
+  for (const mode of ['spider','freecell','klondike','pyramid']) for (const width of [260,274,300,336,354,390,640,1080,1680]) {
+    const layout = boardLayout(mode,width);
+    const indexSize=Math.min(layout.cardWidth*.46,Math.max(12,Math.min(layout.cardWidth*.4,layout.cardWidth*.2+14)));
+    const indexInset=Math.max(2,Math.min(6,layout.cardWidth*.03));
     const labelHeight=indexSize*1.4025;
-    assert.ok(layout.faceStep >= labelHeight+6, `complete label is covered at ${width}px`);
+    assert.ok(layout.faceStep >= labelHeight+indexInset+4, `complete label is covered in ${mode} at ${width}px`);
     assert.ok(layout.columns * layout.cardWidth + (layout.columns - 1) * layout.gap <= width);
     assert.ok(layout.faceStep < layout.cardWidth * 14 / 9);
   }

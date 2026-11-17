@@ -22,11 +22,11 @@
 .card-face[data-art="woodcut"]{--index-paper:#fdf0d3}
 .card.red .card-face{--index-color:#a41920}
 .card .full-face{position:absolute;inset:0;border-radius:inherit;background-repeat:no-repeat;pointer-events:none}
-.card-index{position:absolute;z-index:1;left:1.5px;width:50cqw;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:0;white-space:nowrap;pointer-events:none;color:var(--index-color);font:700 min(46cqw,clamp(12px,40cqw,28px))/.85 Georgia,'Times New Roman',serif;-webkit-text-stroke:1.4px var(--index-paper);paint-order:stroke fill;text-shadow:0 1px 1px var(--index-paper)}
+.card-index{position:absolute;z-index:1;left:clamp(1.5px,3cqw,6px);width:max-content;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:0;white-space:nowrap;pointer-events:none;color:var(--index-color);font:700 min(46cqw,clamp(12px,40cqw,calc(20cqw + 14px)))/.85 Georgia,'Times New Roman',serif;-webkit-text-stroke:1.4px var(--index-paper);paint-order:stroke fill;text-shadow:0 1px 1px var(--index-paper)}
 .card-index b{font:inherit;letter-spacing:-.06em}
 .card-index span{font-size:.65em}
-.card-index-top{top:2px}
-.card-index-bottom{bottom:2px;left:auto;right:1.5px;transform:rotate(180deg)}
+.card-index-top{top:clamp(2px,3cqw,6px)}
+.card-index-bottom{bottom:clamp(2px,3cqw,6px);left:auto;right:clamp(1.5px,3cqw,6px);transform:rotate(180deg)}
 /* Keep centered Pyramid rows inside positive, horizontally scrollable space. */
 .pyramidrow{gap:2px;min-width:0}[data-mode="pyramid"] .stockrow{min-width:0}
 /* Card widths are fitted to the board content width for each game's column count. */
