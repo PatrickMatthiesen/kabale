@@ -1,0 +1,52 @@
+{
+  "idPolicy": "IDs are permanent. Append H4 or R4 for new variants; never relabel an existing variant.",
+  "selection": {
+    "heart": "H3",
+    "royals": "R2",
+    "status": "Preferred direction from user feedback, still a design prototype",
+    "notes": "The curved clear area belongs to the floral heart composition. Keep the broader royal figures from R2; avoid the squeezed diagonal figures in R3."
+  },
+  "variants": [
+    {
+      "id": "H1",
+      "kind": "heart",
+      "name": "Original cleared indices",
+      "file": "woodcut-heart-art-only.webp"
+    },
+    {
+      "id": "H2",
+      "kind": "heart",
+      "name": "Medium curved cutouts",
+      "file": "woodcut-heart-medium-corners.webp"
+    },
+    {
+      "id": "H3",
+      "kind": "heart",
+      "name": "Flowing curved composition",
+      "file": "woodcut-heart-roomy-corners.webp",
+      "preferred": true,
+      "source": "exec-39d20f72-c6ce-48a1-a7f1-d420ec0e3e22.png"
+    },
+    {
+      "id": "R1",
+      "kind": "royals",
+      "name": "Original cleared indices",
+      "file": "woodcut-court-art-only.webp"
+    },
+    {
+      "id": "R2",
+      "kind": "royals",
+      "name": "Moderate cutouts, broader figures",
+      "file": "woodcut-court-balanced-corners.webp",
+      "preferred": true,
+      "source": "exec-c678bcb1-99b7-473b-8d13-48aa4d7125a7.png"
+    },
+    {
+      "id": "R3",
+      "kind": "royals",
+      "name": "Large cutouts, narrow figures",
+      "file": "woodcut-court-roomy-corners.webp",
+      "feedback": "Too narrow"
+    }
+  ]
+}

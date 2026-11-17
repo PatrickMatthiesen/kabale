@@ -90,5 +90,13 @@
     "No production app, engine, cache or artwork files changed."
   ],
   "previousPrototype": "prototype.html",
-  "cornerPrompts": "roomy-corners-prompts.json"
+  "cornerPrompts": "roomy-corners-prompts.json",
+  "preferredArtwork": {
+    "heart": "H3",
+    "royals": "R2",
+    "status": "Preferred direction from user feedback, still a design prototype",
+    "notes": "The curved clear area belongs to the floral heart composition. Keep the broader royal figures from R2; avoid the squeezed diagonal figures in R3."
+  },
+  "variantIndex": "variants.json",
+  "variantBoard": "variants.html"
 }
