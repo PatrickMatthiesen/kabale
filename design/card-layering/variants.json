@@ -2,9 +2,9 @@
   "idPolicy": "IDs are permanent. Append H4 or R4 for new variants; never relabel an existing variant.",
   "selection": {
     "heart": "H3",
-    "royals": "R2",
-    "status": "Preferred direction from user feedback, still a design prototype",
-    "notes": "The curved clear area belongs to the floral heart composition. Keep the broader royal figures from R2; avoid the squeezed diagonal figures in R3."
+    "royals": "R4",
+    "status": "Approved and applied to the game",
+    "notes": "Use H3 flowing corners for number cards and the broader R4 royals. Rank and suit labels are rendered separately from the illustration in both decks."
   },
   "variants": [
     {
@@ -38,7 +38,7 @@
       "kind": "royals",
       "name": "Moderate cutouts, broader figures",
       "file": "woodcut-court-balanced-corners.webp",
-      "preferred": true,
+      "preferred": false,
       "source": "exec-c678bcb1-99b7-473b-8d13-48aa4d7125a7.png"
     },
     {
@@ -58,8 +58,9 @@
         "R2",
         "H3"
       ],
-      "status": "New candidate, not a changed preference",
-      "numberedPreview": "H3-R4-numbered.html"
+      "status": "Approved and applied to the game",
+      "numberedPreview": "H3-R4-numbered.html",
+      "preferred": true
     }
   ]
 }

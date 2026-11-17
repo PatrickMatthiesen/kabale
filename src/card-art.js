@@ -13,20 +13,18 @@ export function getStorage(host) {
 
 const suits = { '♣': 'clubs', '♠': 'spades', '♥': 'hearts', '♦': 'diamonds' };
 
-/** Position a complete face within its generated sheet, without cropping its artwork. */
+/** Select art for the face; rank and suit labels are rendered separately by the card UI. */
 export function cardFace(card, style, {cardWidth = 160, pixelRatio = 1} = {}) {
   if (!suits[card.s] || !Number.isInteger(card.r) || card.r < 1 || card.r > 13 || !artStyles.includes(style)) {
     throw new Error('Unknown card face');
   }
   const court = card.r > 10;
   const index = court ? card.r - 11 : card.r - 1;
-  const columns = court ? 3 : 5;
-  const rows = court ? 1 : 2;
   const variants = artManifest[`${style}-${suits[card.s]}-${court ? 'court' : 'numbers'}`];
   return {
     url: selectArtVariant(variants,cardWidth,pixelRatio).url,
-    size: `${columns * 100}% ${rows * 100}%`,
-    position: `${(index % columns) * 100 / (columns - 1)}% ${rows === 1 ? 0 : Math.floor(index / columns) * 100}%`
+    size: court ? '300% 100%' : '100% 100%',
+    position: court ? `${index * 50}% 0%` : '0% 0%'
   };
 }
 

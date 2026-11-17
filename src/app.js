@@ -80,7 +80,7 @@ function card(c, key, top = 0, blocked = false) {
   const isHint = !!hintRole;
   const label = face ? `${rank(c)} of ${suitNames[c.s]}, ${sourceLabel(key)}` : `Face down card, ${sourceLabel(key)}`;
   const image = face ? cardFace(c, art.resolved,{cardWidth:cardPixels,pixelRatio:window.devicePixelRatio || 1}) : null;
-  const illustration = image ? `<span class="card-face" data-art="${art.resolved}" aria-hidden="true"><span class="readable-index"><b>${rank(c)}</b><span>${c.s}\uFE0E</span></span><span class="full-face" data-rank="${c.r}" data-suit="${c.s}" style="background-image:url('${image.url}');background-size:${image.size};background-position:${image.position}"></span></span>` : '<span class="back-medallion" aria-hidden="true">K</span>';
+  const illustration = image ? `<span class="card-face" data-art="${art.resolved}" aria-hidden="true"><span class="full-face" data-rank="${c.r}" data-suit="${c.s}" style="background-image:url('${image.url}');background-size:${image.size};background-position:${image.position}"></span><span class="card-index card-index-top"><b>${rank(c)}</b><span>${c.s}\uFE0E</span></span><span class="card-index card-index-bottom"><b>${rank(c)}</b><span>${c.s}\uFE0E</span></span></span>` : '<span class="back-medallion" aria-hidden="true">K</span>';
   return `<button type="button" class="card ${face ? 'illustrated' : 'back'} ${face && ['♥','♦'].includes(c.s) ? 'red' : ''} ${isSelected ? 'selected' : ''} ${isHint ? 'hinted' : ''} ${hintRole}" style="top:${typeof top === 'number' ? `${top}px` : top}" data-key="${key}" aria-label="${label}" aria-pressed="${isSelected}" ${blocked || !face && key !== 'stock' ? 'disabled' : ''}>${illustration}</button>`;
 }
 function waste(cards, key) {

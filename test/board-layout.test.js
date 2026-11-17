@@ -27,10 +27,12 @@ test('mobile card width remains determined by columns, even in a short viewport'
   assert.equal(boardLayout('spider',354,200).cardWidth,boardLayout('spider',354,900).cardWidth);
 });
 
-test('narrow Spider stacks expose enough space for readable ranks without horizontal overflow', () => {
+test('narrow Spider stacks expose complete rank and suit labels without horizontal overflow', () => {
   for (const width of [260,274,300,336,354,390]) {
     const layout = boardLayout('spider',width);
-    assert.ok(layout.faceStep >= 18, `rank strip is covered at ${width}px`);
+    const indexSize=Math.min(layout.cardWidth*.46,Math.max(12,Math.min(28,layout.cardWidth*.4)));
+    const labelHeight=indexSize*1.4025;
+    assert.ok(layout.faceStep >= labelHeight+6, `complete label is covered at ${width}px`);
     assert.ok(layout.columns * layout.cardWidth + (layout.columns - 1) * layout.gap <= width);
     assert.ok(layout.faceStep < layout.cardWidth * 14 / 9);
   }

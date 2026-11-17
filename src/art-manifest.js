@@ -2,274 +2,274 @@
 export const artManifest = {
   "engraved-clubs-court": [
     {
-      "url": "./assets/cards/optimized/engraved-clubs-court-small.f65757c2b7abca0c.webp",
+      "url": "./assets/cards/optimized/engraved-clubs-court-small.ff16475849a67e66.webp",
       "width": 80,
-      "bytes": 18628
+      "bytes": 18100
     },
     {
-      "url": "./assets/cards/optimized/engraved-clubs-court-medium.ab99b8c1eed4544c.webp",
+      "url": "./assets/cards/optimized/engraved-clubs-court-medium.3b8759638b0dcd2d.webp",
       "width": 160,
-      "bytes": 64816
+      "bytes": 63056
     },
     {
-      "url": "./assets/cards/optimized/engraved-clubs-court-full.22ec1d47e94197aa.webp",
+      "url": "./assets/cards/optimized/engraved-clubs-court-full.68c437049541da95.webp",
       "width": 512,
-      "bytes": 495242
+      "bytes": 513144
     }
   ],
   "engraved-clubs-numbers": [
     {
-      "url": "./assets/cards/optimized/engraved-clubs-numbers-small.bb427629b1a968fa.webp",
+      "url": "./assets/cards/optimized/engraved-clubs-numbers-small.75283a977f613690.webp",
       "width": 80,
-      "bytes": 46736
+      "bytes": 2902
     },
     {
-      "url": "./assets/cards/optimized/engraved-clubs-numbers-medium.8a817a3acb952435.webp",
+      "url": "./assets/cards/optimized/engraved-clubs-numbers-medium.2d28891fb38b161c.webp",
       "width": 160,
-      "bytes": 146834
+      "bytes": 9782
     },
     {
-      "url": "./assets/cards/optimized/engraved-clubs-numbers-full.d7f3397d69d3159d.webp",
-      "width": 280.4,
-      "bytes": 362958
+      "url": "./assets/cards/optimized/engraved-clubs-numbers-full.f83d5f106669e89b.webp",
+      "width": 1005,
+      "bytes": 306182
     }
   ],
   "engraved-diamonds-court": [
     {
-      "url": "./assets/cards/optimized/engraved-diamonds-court-small.ff0309b27c2c4489.webp",
+      "url": "./assets/cards/optimized/engraved-diamonds-court-small.701a45d40513b591.webp",
       "width": 80,
-      "bytes": 18782
+      "bytes": 18262
     },
     {
-      "url": "./assets/cards/optimized/engraved-diamonds-court-medium.ca40c6e57c19d3ed.webp",
+      "url": "./assets/cards/optimized/engraved-diamonds-court-medium.7a15b467d9dafad9.webp",
       "width": 160,
-      "bytes": 64446
+      "bytes": 64520
     },
     {
-      "url": "./assets/cards/optimized/engraved-diamonds-court-full.181a42770b08f896.webp",
+      "url": "./assets/cards/optimized/engraved-diamonds-court-full.2519cf162b5bfe69.webp",
       "width": 512,
-      "bytes": 462072
+      "bytes": 489592
     }
   ],
   "engraved-diamonds-numbers": [
     {
-      "url": "./assets/cards/optimized/engraved-diamonds-numbers-small.e545070b10b84930.webp",
+      "url": "./assets/cards/optimized/engraved-diamonds-numbers-small.cba563e159476c3d.webp",
       "width": 80,
-      "bytes": 46204
+      "bytes": 2992
     },
     {
-      "url": "./assets/cards/optimized/engraved-diamonds-numbers-medium.4a6900813f819c61.webp",
+      "url": "./assets/cards/optimized/engraved-diamonds-numbers-medium.f55d08c27fc26eea.webp",
       "width": 160,
-      "bytes": 143772
+      "bytes": 9878
     },
     {
-      "url": "./assets/cards/optimized/engraved-diamonds-numbers-full.9e0f5001d3e2e9a1.webp",
-      "width": 280.4,
-      "bytes": 352796
+      "url": "./assets/cards/optimized/engraved-diamonds-numbers-full.b973c436b826890d.webp",
+      "width": 1006,
+      "bytes": 282136
     }
   ],
   "engraved-hearts-court": [
     {
-      "url": "./assets/cards/optimized/engraved-hearts-court-small.85e6822ea1886031.webp",
+      "url": "./assets/cards/optimized/engraved-hearts-court-small.f6f18880bec383f8.webp",
       "width": 80,
-      "bytes": 18910
+      "bytes": 18216
     },
     {
-      "url": "./assets/cards/optimized/engraved-hearts-court-medium.4e0cfed1b1e474a5.webp",
+      "url": "./assets/cards/optimized/engraved-hearts-court-medium.bf19f8db7743eb40.webp",
       "width": 160,
-      "bytes": 64570
+      "bytes": 63824
     },
     {
-      "url": "./assets/cards/optimized/engraved-hearts-court-full.9839fe92ece309c8.webp",
+      "url": "./assets/cards/optimized/engraved-hearts-court-full.9ce3db896302da63.webp",
       "width": 512,
-      "bytes": 465586
+      "bytes": 469512
     }
   ],
   "engraved-hearts-numbers": [
     {
-      "url": "./assets/cards/optimized/engraved-hearts-numbers-small.206cbd7788997977.webp",
+      "url": "./assets/cards/optimized/engraved-hearts-numbers-small.77a1624fff17331d.webp",
       "width": 80,
-      "bytes": 45902
+      "bytes": 2870
     },
     {
-      "url": "./assets/cards/optimized/engraved-hearts-numbers-medium.0080145146df793f.webp",
+      "url": "./assets/cards/optimized/engraved-hearts-numbers-medium.e688c2bd92104dfa.webp",
       "width": 160,
-      "bytes": 149440
+      "bytes": 9366
     },
     {
-      "url": "./assets/cards/optimized/engraved-hearts-numbers-full.9009b6fd21a30f49.webp",
-      "width": 280.4,
-      "bytes": 376124
+      "url": "./assets/cards/optimized/engraved-hearts-numbers-full.62c595fd2f4d2ca0.webp",
+      "width": 1060,
+      "bytes": 310400
     }
   ],
   "engraved-spades-court": [
     {
-      "url": "./assets/cards/optimized/engraved-spades-court-small.d511864cb1ee0a39.webp",
+      "url": "./assets/cards/optimized/engraved-spades-court-small.e8761eac60902b04.webp",
       "width": 80,
-      "bytes": 19060
+      "bytes": 18456
     },
     {
-      "url": "./assets/cards/optimized/engraved-spades-court-medium.23c3888411e6ca38.webp",
+      "url": "./assets/cards/optimized/engraved-spades-court-medium.f5bb90f45d54dfe3.webp",
       "width": 160,
-      "bytes": 64340
+      "bytes": 64702
     },
     {
-      "url": "./assets/cards/optimized/engraved-spades-court-full.7ffbd346d60e4358.webp",
+      "url": "./assets/cards/optimized/engraved-spades-court-full.f6c6fe706891f06c.webp",
       "width": 512,
-      "bytes": 470940
+      "bytes": 482498
     }
   ],
   "engraved-spades-numbers": [
     {
-      "url": "./assets/cards/optimized/engraved-spades-numbers-small.10bfb731aff8c6f0.webp",
+      "url": "./assets/cards/optimized/engraved-spades-numbers-small.48d108945bea8bb6.webp",
       "width": 80,
-      "bytes": 46410
+      "bytes": 3138
     },
     {
-      "url": "./assets/cards/optimized/engraved-spades-numbers-medium.43352730a32a1e84.webp",
+      "url": "./assets/cards/optimized/engraved-spades-numbers-medium.033d91a4a0344d2e.webp",
       "width": 160,
-      "bytes": 145972
+      "bytes": 10144
     },
     {
-      "url": "./assets/cards/optimized/engraved-spades-numbers-full.9dd7a5542e741276.webp",
-      "width": 280.4,
-      "bytes": 352718
+      "url": "./assets/cards/optimized/engraved-spades-numbers-full.12cb08ee38421f97.webp",
+      "width": 1006,
+      "bytes": 261082
     }
   ],
   "woodcut-clubs-court": [
     {
-      "url": "./assets/cards/optimized/woodcut-clubs-court-small.73a0a49f86d74580.webp",
+      "url": "./assets/cards/optimized/woodcut-clubs-court-small.7ffc8bec1227e047.webp",
       "width": 80,
-      "bytes": 20248
+      "bytes": 19926
     },
     {
-      "url": "./assets/cards/optimized/woodcut-clubs-court-medium.df4461114e3a148d.webp",
+      "url": "./assets/cards/optimized/woodcut-clubs-court-medium.df5e1a5d4ad3440a.webp",
       "width": 160,
-      "bytes": 63730
+      "bytes": 65060
     },
     {
-      "url": "./assets/cards/optimized/woodcut-clubs-court-full.ffd976f497e10c03.webp",
+      "url": "./assets/cards/optimized/woodcut-clubs-court-full.ed6262f89bb7b161.webp",
       "width": 512,
-      "bytes": 392128
+      "bytes": 360912
     }
   ],
   "woodcut-clubs-numbers": [
     {
-      "url": "./assets/cards/optimized/woodcut-clubs-numbers-small.76841124440abad1.webp",
+      "url": "./assets/cards/optimized/woodcut-clubs-numbers-small.0d2045c6e49c1742.webp",
       "width": 80,
-      "bytes": 51720
+      "bytes": 3328
     },
     {
-      "url": "./assets/cards/optimized/woodcut-clubs-numbers-medium.7556c33ddb609a9b.webp",
+      "url": "./assets/cards/optimized/woodcut-clubs-numbers-medium.b0b008bfe6460e38.webp",
       "width": 160,
-      "bytes": 151712
+      "bytes": 10178
     },
     {
-      "url": "./assets/cards/optimized/woodcut-clubs-numbers-full.14c940007292efa7.webp",
-      "width": 280.4,
-      "bytes": 358400
+      "url": "./assets/cards/optimized/woodcut-clubs-numbers-full.f92aad5b95577af8.webp",
+      "width": 1060,
+      "bytes": 179550
     }
   ],
   "woodcut-diamonds-court": [
     {
-      "url": "./assets/cards/optimized/woodcut-diamonds-court-small.540191ec20bb5afc.webp",
+      "url": "./assets/cards/optimized/woodcut-diamonds-court-small.8d228a8b96f445b5.webp",
       "width": 80,
-      "bytes": 20466
+      "bytes": 19920
     },
     {
-      "url": "./assets/cards/optimized/woodcut-diamonds-court-medium.dbd13115b1ea44da.webp",
+      "url": "./assets/cards/optimized/woodcut-diamonds-court-medium.57a3f32aec3fffea.webp",
       "width": 160,
-      "bytes": 63236
+      "bytes": 64990
     },
     {
-      "url": "./assets/cards/optimized/woodcut-diamonds-court-full.6af246042bd3a557.webp",
+      "url": "./assets/cards/optimized/woodcut-diamonds-court-full.faa16534e159c48c.webp",
       "width": 512,
-      "bytes": 367306
+      "bytes": 364234
     }
   ],
   "woodcut-diamonds-numbers": [
     {
-      "url": "./assets/cards/optimized/woodcut-diamonds-numbers-small.b1db8fe3b8061194.webp",
+      "url": "./assets/cards/optimized/woodcut-diamonds-numbers-small.0e8e4926491cf83c.webp",
       "width": 80,
-      "bytes": 53716
+      "bytes": 3280
     },
     {
-      "url": "./assets/cards/optimized/woodcut-diamonds-numbers-medium.1688e1d4aeb2c461.webp",
+      "url": "./assets/cards/optimized/woodcut-diamonds-numbers-medium.2f7bd8d4989e15fe.webp",
       "width": 160,
-      "bytes": 150690
+      "bytes": 10064
     },
     {
-      "url": "./assets/cards/optimized/woodcut-diamonds-numbers-full.d9dc6d5ba9bf1b36.webp",
-      "width": 280.4,
-      "bytes": 347346
+      "url": "./assets/cards/optimized/woodcut-diamonds-numbers-full.16a1beeb0edf0939.webp",
+      "width": 1060,
+      "bytes": 164948
     }
   ],
   "woodcut-hearts-court": [
     {
-      "url": "./assets/cards/optimized/woodcut-hearts-court-small.c9c4005fc06989d9.webp",
+      "url": "./assets/cards/optimized/woodcut-hearts-court-small.0c630c7be8cab921.webp",
       "width": 80,
-      "bytes": 20490
+      "bytes": 19808
     },
     {
-      "url": "./assets/cards/optimized/woodcut-hearts-court-medium.c87d890606c18481.webp",
+      "url": "./assets/cards/optimized/woodcut-hearts-court-medium.6f979554eb5dbdd2.webp",
       "width": 160,
-      "bytes": 63386
+      "bytes": 64794
     },
     {
-      "url": "./assets/cards/optimized/woodcut-hearts-court-full.fb0494f4882fd3e6.webp",
+      "url": "./assets/cards/optimized/woodcut-hearts-court-full.f865ef989f76ff39.webp",
       "width": 512,
-      "bytes": 368192
+      "bytes": 367136
     }
   ],
   "woodcut-hearts-numbers": [
     {
-      "url": "./assets/cards/optimized/woodcut-hearts-numbers-small.0ba9464896bd7169.webp",
+      "url": "./assets/cards/optimized/woodcut-hearts-numbers-small.f8d8dce850991e33.webp",
       "width": 80,
-      "bytes": 53660
+      "bytes": 3218
     },
     {
-      "url": "./assets/cards/optimized/woodcut-hearts-numbers-medium.862426cdc8d2a1ac.webp",
+      "url": "./assets/cards/optimized/woodcut-hearts-numbers-medium.d2548d3a8067c059.webp",
       "width": 160,
-      "bytes": 151076
+      "bytes": 9986
     },
     {
-      "url": "./assets/cards/optimized/woodcut-hearts-numbers-full.14004476ac44cd21.webp",
-      "width": 280.4,
-      "bytes": 348622
+      "url": "./assets/cards/optimized/woodcut-hearts-numbers-full.c5f6ead2cf7563c7.webp",
+      "width": 1060,
+      "bytes": 178740
     }
   ],
   "woodcut-spades-court": [
     {
-      "url": "./assets/cards/optimized/woodcut-spades-court-small.d05175ce93d32d9c.webp",
+      "url": "./assets/cards/optimized/woodcut-spades-court-small.889f0e783c55bc47.webp",
       "width": 80,
-      "bytes": 20360
+      "bytes": 19892
     },
     {
-      "url": "./assets/cards/optimized/woodcut-spades-court-medium.4d17353ab05272de.webp",
+      "url": "./assets/cards/optimized/woodcut-spades-court-medium.a7a985d7a8be9d4b.webp",
       "width": 160,
-      "bytes": 63146
+      "bytes": 64358
     },
     {
-      "url": "./assets/cards/optimized/woodcut-spades-court-full.cd08860945e292cf.webp",
+      "url": "./assets/cards/optimized/woodcut-spades-court-full.daeb343352a89ab6.webp",
       "width": 512,
-      "bytes": 359236
+      "bytes": 356424
     }
   ],
   "woodcut-spades-numbers": [
     {
-      "url": "./assets/cards/optimized/woodcut-spades-numbers-small.510133ccb86a57d0.webp",
+      "url": "./assets/cards/optimized/woodcut-spades-numbers-small.5f566dd2e3663226.webp",
       "width": 80,
-      "bytes": 51418
+      "bytes": 3976
     },
     {
-      "url": "./assets/cards/optimized/woodcut-spades-numbers-medium.4a810525a8e69c29.webp",
+      "url": "./assets/cards/optimized/woodcut-spades-numbers-medium.f9f68013e4077eae.webp",
       "width": 160,
-      "bytes": 148310
+      "bytes": 12462
     },
     {
-      "url": "./assets/cards/optimized/woodcut-spades-numbers-full.e3eec040b035f3e7.webp",
-      "width": 280.4,
-      "bytes": 337130
+      "url": "./assets/cards/optimized/woodcut-spades-numbers-full.e2ef905d7873f4ba.webp",
+      "width": 1006,
+      "bytes": 202098
     }
   ]
 };

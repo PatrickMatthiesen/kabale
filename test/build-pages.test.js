@@ -47,3 +47,31 @@ test('a dependency change versions the published HTML, styles and complete modul
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('Pages publishes current and retained hashed card artwork', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'kabale-art-build-'));
+  const script = fileURLToPath(new URL('../scripts/build-pages.js', import.meta.url));
+  const retained = JSON.parse(await readFile(new URL('../assets/cards/retained-art.json', import.meta.url), 'utf8'));
+  const manifest = await import('../src/art-manifest.js');
+  const previousName = retained.files[0];
+  const currentName = Object.values(manifest.artManifest)[0][0].url.split('/').at(-1);
+  const sourceRoot = new URL('../assets/cards/optimized/', import.meta.url);
+  const outputPath = name => path.join(directory, '_site', 'assets', 'cards', 'optimized', name);
+  try {
+    await mkdir(path.join(directory, 'src'));
+    await mkdir(path.join(directory, 'assets/cards/optimized'), { recursive: true });
+    await writeFile(path.join(directory, 'index.html'), '<script type="module" src="src/app.js"></script>');
+    await writeFile(path.join(directory, 'sw.js'), '// artwork worker');
+    await writeFile(path.join(directory, 'src/app.js'), '');
+    await writeFile(path.join(directory, 'assets/cards/optimized', previousName), await readFile(new URL(previousName, sourceRoot)));
+    await writeFile(path.join(directory, 'assets/cards/optimized', currentName), await readFile(new URL(currentName, sourceRoot)));
+    const result = spawnSync(process.execPath, [script], { cwd: directory, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(await readFile(outputPath(previousName)), await readFile(new URL(previousName, sourceRoot)));
+    assert.deepEqual(await readFile(outputPath(currentName)), await readFile(new URL(currentName, sourceRoot)));
+  } finally {
+    assert.equal(path.dirname(directory), path.resolve(tmpdir()));
+    assert.ok(path.basename(directory).startsWith('kabale-art-build-'));
+    await rm(directory, { recursive: true, force: true });
+  }
+});

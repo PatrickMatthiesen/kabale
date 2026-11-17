@@ -12,20 +12,33 @@ test('a denied storage getter still allows default art and preference changes', 
   assert.doesNotThrow(()=>saveArt(storage,{choice:'woodcut',resolved:'woodcut'}));
 });
 
-test('every rank and suit maps to a unique complete face in both decks', () => {
+test('all ranks map to their suit artwork, with shared number art and indexed court art', () => {
   for (const style of ['engraved','woodcut']) {
-    const faces = new Set();
-    for (const s of ['♣','♠','♥','♦']) for (let r=1;r<=13;r++) {
-      const face=cardFace({r,s},style);
-      assert.ok(existsSync(new URL(`../${face.url}`, import.meta.url)));
-      faces.add(face.url+face.position);
+    for (const [s,suit] of [['♣','clubs'],['♠','spades'],['♥','hearts'],['♦','diamonds']]) {
+      const numbers=artManifest[`${style}-${suit}-numbers`];
+      const court=artManifest[`${style}-${suit}-court`];
+      assert.ok(existsSync(new URL(`../${cardFace({r:1,s},style).url}`, import.meta.url)));
+      for(let r=1;r<=10;r++) {
+        assert.deepEqual(cardFace({r,s},style),{url:selectArtVariant(numbers).url,size:'100% 100%',position:'0% 0%'});
+      }
+      for(let r=11;r<=13;r++) {
+        assert.deepEqual(cardFace({r,s},style),{url:selectArtVariant(court).url,size:'300% 100%',position:`${(r-11)*50}% 0%`});
+      }
     }
-    assert.equal(faces.size,52);
   }
 });
 
-test('sprite coordinates retain complete edge faces, including ten and king', () => {
-  assert.deepEqual(cardFace({r:10,s:'♥'},'woodcut'), {url:artManifest['woodcut-hearts-numbers'][1].url,size:'500% 200%',position:'100% 100%'});
+test('all sixteen art-only layered sources are present', async () => {
+  const { readdir }=await import('node:fs/promises');
+  const names=new Set(await readdir(new URL('../assets/cards/layered/',import.meta.url)));
+  for(const style of ['engraved','woodcut']) for(const suit of ['clubs','spades','hearts','diamonds']) for(const kind of ['numbers','court']) {
+    assert.ok(names.has(`${style}-${suit}-${kind}.jpg`),`Missing ${style}-${suit}-${kind}.jpg`);
+  }
+});
+
+test('shared number art and court coordinates retain complete faces', () => {
+  assert.deepEqual(cardFace({r:10,s:'♥'},'woodcut'), {url:artManifest['woodcut-hearts-numbers'][1].url,size:'100% 100%',position:'0% 0%'});
+  assert.deepEqual(cardFace({r:11,s:'♠'},'engraved'), {url:artManifest['engraved-spades-court'][1].url,size:'300% 100%',position:'0% 0%'});
   assert.deepEqual(cardFace({r:13,s:'♠'},'engraved'), {url:artManifest['engraved-spades-court'][1].url,size:'300% 100%',position:'100% 0%'});
 });
 
@@ -49,6 +62,17 @@ test('every generated variant exists and its filename matches its bytes', async 
     const hash=createHash('sha256').update(bytes).digest('hex').slice(0,16);
     assert.ok(variant.url.endsWith(`.${hash}.webp`));
     assert.equal(bytes.length,variant.bytes);
+  }
+});
+
+test('retained previous-generation artwork exists and matches its content hash', async () => {
+  const { createHash }=await import('node:crypto');
+  const retained=JSON.parse(await Bun.file(new URL('../assets/cards/retained-art.json',import.meta.url)).text());
+  assert.match(retained.reason,/open game tabs/i);
+  assert.equal(retained.files.length,48);
+  for(const file of retained.files) {
+    const bytes=await Bun.file(new URL(`../assets/cards/optimized/${file}`,import.meta.url)).bytes();
+    assert.ok(file.endsWith(`.${createHash('sha256').update(bytes).digest('hex').slice(0,16)}.webp`),file);
   }
 });
 

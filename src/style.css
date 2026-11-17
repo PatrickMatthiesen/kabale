@@ -9,25 +9,24 @@
 
 
 #board{--card-paper:#f8f0dc}#board[data-art="woodcut"]{--card-paper:#fdf0d3}.card:not(.back){color-scheme:only light;background:var(--card-paper);border-color:#cdbd99}.card:not(.back):hover{filter:none}.card.hinted,.pile.hinted,.col.hinted{outline:2px dashed #85ddd2;outline-offset:-3px;animation:none}.card.hinted::after,.pile.hinted:has(.empty-target)::after{content:'Hint';position:absolute;top:3px;right:3px;padding:2px 4px;border-radius:3px;background:#164b49;color:#d4fff5;font:600 9px/1.2 'Segoe UI',sans-serif;pointer-events:none}.card.hint-source::after{content:'Move'}.card.hint-destination::after,.pile.hint-destination:has(.empty-target)::after{content:'Here'}.card.selected{outline:3px solid #f1d37d;outline-offset:2px}
-/* Complete generated faces include their own paper, indices and ornament. */
+/* Full illustrations supply their paper and ornament; indices are separate. */
 .card.illustrated{border:0;background:transparent;color-scheme:only light}.full-face{position:absolute;inset:0;border-radius:inherit;background-repeat:no-repeat;pointer-events:none}.card.illustrated:hover{filter:none}.waste-pile{isolation:isolate;overflow:visible;border:0;background:none}.waste-layer{position:absolute;inset:0;transform-origin:50% 60%}.waste-ghost{pointer-events:none}.waste-ghost .card{pointer-events:none}.card.hinted::after,.pile.hinted:has(.empty-target)::after{top:-10px;right:-4px}
 #board{--card-h:calc(var(--card-w) * 14 / 9);--face-step:clamp(28px,3.4vw,38px);--back-step:20px}
 
 
 .col.hint-destination:has(.empty-target)::after{content:'Here';position:absolute;top:-10px;right:-4px;padding:2px 4px;border-radius:3px;background:#164b49;color:#d4fff5;font:600 9px/1.2 'Segoe UI',sans-serif;pointer-events:none}.card.back.hint-source::after{content:'Draw'}
 .rules-list{padding-left:20px;color:#c4d0c1;font-size:14px;line-height:1.65}.rules-list li+li{margin-top:12px}
-/* Small cards reserve room for crisp indices, with the complete art below. */
+/* Layered indices stay readable while the full illustration keeps its 9:14 crop. */
 .card{container-type:inline-size;container-name:playing-card}
-.card-face{position:absolute;inset:0;border-radius:inherit;pointer-events:none;--index-paper:#f8f0dc}
+.card-face{position:absolute;inset:0;border-radius:inherit;pointer-events:none;--index-paper:#f8f0dc;--index-color:#172d25}
 .card-face[data-art="woodcut"]{--index-paper:#fdf0d3}
-.readable-index{display:none}
-@container playing-card (max-width:64px){
- .card-face{--index-size:clamp(12px,42cqw,22px);--index-h:calc(var(--index-size) + 4px);background:var(--index-paper);box-shadow:inset 0 0 0 1px #cdbd99;overflow:hidden}
- .readable-index{position:absolute;inset:1px 2px auto;display:flex;align-items:center;justify-content:space-between;height:var(--index-h);color:#172d25;font:700 var(--index-size)/1 Georgia,'Times New Roman',serif}
- .readable-index b{font:inherit;letter-spacing:-.05em}.readable-index span{font-size:.8em}
- .red .readable-index{color:#ac2426}
- .card-face .full-face{inset:auto;top:var(--index-h);left:50%;width:calc((100cqw * 14 / 9 - var(--index-h) - 2px) * 9 / 14);height:calc(100% - var(--index-h) - 2px);transform:translateX(-50%);border-radius:2px}
-}
+.card.red .card-face{--index-color:#a41920}
+.card .full-face{position:absolute;inset:0;border-radius:inherit;background-repeat:no-repeat;pointer-events:none}
+.card-index{position:absolute;z-index:1;left:1.5px;width:50cqw;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:0;white-space:nowrap;pointer-events:none;color:var(--index-color);font:700 min(46cqw,clamp(12px,40cqw,28px))/.85 Georgia,'Times New Roman',serif;-webkit-text-stroke:1.4px var(--index-paper);paint-order:stroke fill;text-shadow:0 1px 1px var(--index-paper)}
+.card-index b{font:inherit;letter-spacing:-.06em}
+.card-index span{font-size:.65em}
+.card-index-top{top:2px}
+.card-index-bottom{bottom:2px;left:auto;right:1.5px;transform:rotate(180deg)}
 /* Keep centered Pyramid rows inside positive, horizontally scrollable space. */
 .pyramidrow{gap:2px;min-width:0}[data-mode="pyramid"] .stockrow{min-width:0}
 /* Card widths are fitted to the board content width for each game's column count. */

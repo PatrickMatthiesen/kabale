@@ -10,7 +10,10 @@ export function boardLayout(mode, contentWidth, availableHeight = Infinity) {
   const heightRatio = { klondike: 4, spider: 4, freecell: 6.1, pyramid: 7 }[mode] ?? 4;
   const heightLimit = contentWidth >= 640 ? Math.max(40, (availableHeight - 40) / heightRatio) : Infinity;
   const cardWidth = Math.floor(Math.min(160, heightLimit, Math.max(0, (contentWidth - (columns - 1) * gap - 1) / columns)) * 100) / 100;
-  // Keep the larger rank strip exposed in narrow ten-column layouts.
-  const faceStep = Math.min(64, Math.max(Math.min(18, cardWidth), cardWidth * .6));
+  // Keep both rank and suit labels exposed on the smallest cards.
+  const indexSize = Math.min(cardWidth * .46, Math.max(12, Math.min(28, cardWidth * .4)));
+  const labelHeight = indexSize * 1.4025;
+  const cardHeight = cardWidth * 14 / 9;
+  const faceStep = Math.min(cardHeight - 1, Math.min(64, Math.max(Math.min(18, cardWidth), cardWidth * .6, labelHeight + 6)));
   return { columns, gap, cardWidth, faceStep, backStep: Math.min(28, cardWidth * .32) };
 }
