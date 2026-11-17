@@ -4,8 +4,8 @@
   "recommendation": {
     "art": "Use artwork with no printed rank letters, digits, or small corner suit indices. Keep the central ornamental suit motif and full-size illustration.",
     "values": "Render rank and suit from game state as independent text at fixed corners. Use a fine warm-paper halo where art is busy, rather than a full-width header or a flat opaque patch.",
-    "compact": "Use a rank at upper left and a suit at upper right so both fit within the exposed part of a narrow stacked card. Mirror the pair at the bottom.",
-    "scaling": "Change label size independently from artwork scale. Keep labels visible in stacks and cap size to prevent 10 and its suit from colliding.",
+    "compact": "Pair the rank and suit in the top-left clear corner, mirrored at bottom right. Leave enough of each stacked card exposed for the complete label.",
+    "scaling": "Increase the illustration-free corner areas and cap labels to their width. Stack spacing follows the rendered label height, so increasing text does not cover the next card.",
     "limits": "Most reference games show larger cards or icons than a ten-column phone solitaire board. Their visual hierarchy transfers; their exact sizes do not. Inspection is for secondary details, not a replacement for readable ranks at rest."
   },
   "findings": [
@@ -70,13 +70,25 @@
       "file": "woodcut-heart-art-only.png",
       "optimized": "woodcut-heart-art-only.webp",
       "description": "Image-generator art-only floral heart sample. It can be reused for several ranks because the values are a separate layer."
+    },
+    {
+      "file": "woodcut-court-roomy-corners.png",
+      "optimized": "woodcut-court-roomy-corners.webp",
+      "description": "Royal illustrations reflowed around larger paired-index corners."
+    },
+    {
+      "file": "woodcut-heart-roomy-corners.png",
+      "optimized": "woodcut-heart-roomy-corners.webp",
+      "description": "Floral illustration reflowed around larger paired-index corners."
     }
   ],
   "prompts": "prompts.json",
-  "prototype": "prototype.html",
+  "prototype": "roomy-corners.html",
   "checks": [
     "HTML prototype rendered at phone width with no console errors.",
     "Samples inspected for removed indices and retained illustrations.",
     "No production app, engine, cache or artwork files changed."
-  ]
+  ],
+  "previousPrototype": "prototype.html",
+  "cornerPrompts": "roomy-corners-prompts.json"
 }
