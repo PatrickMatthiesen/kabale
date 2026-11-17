@@ -2,9 +2,9 @@ const suits = ['♠','♥','♦','♣'];
 const red = c => c.s === '♥' || c.s === '♦';
 export const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
 function deck(n=1, suitCount=4) { return shuffle(Array.from({length:n},(_,d)=>suits.slice(0,suitCount).flatMap(s=>Array.from({length:13},(_,i)=>({r:i+1,s,id:`${d}-${s}-${i+1}`,up:false})))).flat()); }
-export function deal(mode,difficulty='normal') {
+export function deal(mode,difficulty='normal',options={}) {
  const g={mode,difficulty,moves:0,won:false,cols:[],stock:[],waste:[],found:[],cells:[],removed:[]};
- if(mode==='klondike'){const d=deck();g.drawCount=difficulty==='hard'?3:1;g.cols=Array.from({length:7},(_,i)=>d.splice(0,i+1).map((c,j)=>({...c,up:j===i})));g.stock=d;g.found=Array.from({length:4},()=>[]);}
+ if(mode==='klondike'){g.emptyColumns=options.emptyColumns==='any'?'any':'kings';const d=deck();g.drawCount=difficulty==='hard'?3:1;g.cols=Array.from({length:7},(_,i)=>d.splice(0,i+1).map((c,j)=>({...c,up:j===i})));g.stock=d;g.found=Array.from({length:4},()=>[]);}
  else if(mode==='freecell'){const d=deck();g.cols=Array.from({length:8},()=>[]);d.forEach((c,i)=>{c.up=true;g.cols[i%8].push(c)});g.cells=Array(difficulty==='hard'?2:4).fill(null);g.found=Array.from({length:4},()=>[]);}
  else if(mode==='spider'){g.suitCount=difficulty==='easy'?1:difficulty==='hard'?4:2;const d=shuffle(Array.from({length:8/g.suitCount},(_,pack)=>suits.slice(0,g.suitCount).flatMap(s=>Array.from({length:13},(_,i)=>({r:i+1,s,id:`sp-${pack}-${s}-${i+1}`,up:false})))).flat());g.cols=Array.from({length:10},(_,i)=>{const c=d.splice(0,i<4?6:5);c.forEach((x,j)=>x.up=j===c.length-1);return c});g.stock=d;}
  else if(mode==='pyramid'){const d=deck();for(let y=0;y<7;y++)g.cols.push(d.splice(0,y+1).map(c=>({...c,up:true})));g.stock=d;g.pairWaste=[];g.redealsLeft=difficulty==='easy'?2:difficulty==='normal'?1:0;}
@@ -14,7 +14,7 @@ export const runValid=(a,m)=>a.length>0&&a.every(c=>c?.up)&&a.slice(1).every((c,
 const parts=k=>String(k).split(':');
 function src(g,k){const [t,x,y]=parts(k);if(t==='col'){const a=g.cols[+x];return a?{a,i:y===undefined?a.length-1:+y,t,x:+x}:null}if(t==='cell')return g.cells[+x]?{a:[g.cells[+x]],i:0,t,x:+x}:null;if(t==='waste')return g.waste?.length?{a:g.waste,i:g.waste.length-1,t}:null;if(t==='found')return g.mode!=='spider'&&g.found?.[+x]?.length?{a:g.found[+x],i:g.found[+x].length-1,t,x:+x}:null;return null;}
 function seq(g,k){const s=src(g,k);return s?{...s,c:s.a.slice(s.i)}:null}
-function tableOK(g,c,to){const [t,x]=parts(to),a=g.cols[+x];if(t!=='col'||!a||!runValid(c,g.mode)||c[0]?.id&&a.some(v=>v.id===c[0].id))return false;const top=a.at(-1);if(g.mode==='spider')return !top||top.r===c[0].r+1;if(g.mode==='freecell'&&c.length>(g.cells.filter(v=>!v).length+1)*2**g.cols.filter((v,i)=>!v.length&&i!==+x).length)return false;return top?top.r===c[0].r+1&&red(top)!==red(c[0]):g.mode==='freecell'||c[0].r===13;}
+function tableOK(g,c,to){const [t,x]=parts(to),a=g.cols[+x];if(t!=='col'||!a||!runValid(c,g.mode)||c[0]?.id&&a.some(v=>v.id===c[0].id))return false;const top=a.at(-1);if(g.mode==='spider')return !top||top.r===c[0].r+1;if(g.mode==='freecell'&&c.length>(g.cells.filter(v=>!v).length+1)*2**g.cols.filter((v,i)=>!v.length&&i!==+x).length)return false;return top?top.r===c[0].r+1&&red(top)!==red(c[0]):g.mode==='freecell'||(g.mode==='klondike'&&g.emptyColumns==='any')||c[0].r===13;}
 function valid(g,f,t){if(f===t)return false;const [tt,tx]=parts(t),s=seq(g,f);if(!s)return false;const c=s.c[0],n=s.c.length;if(!c||!c.up)return false;if(tableOK(g,s.c,t))return true;if(tt==='cell')return g.mode==='freecell'&&Number.isInteger(+tx)&&+tx>=0&&+tx<g.cells.length&&!g.cells[+tx]&&n===1;if(tt==='found'){const a=g.found[+tx];return a&&n===1&&g.mode!=='spider'&&(a.length?a.at(-1).s===c.s&&a.at(-1).r+1===c.r:c.r===1);}return false;}
 export function canMove(g,f,t,start){return valid(g,start===undefined?`col:${f}`:`col:${f}:${start}`,`col:${t}`)}
 function pop(g,s){const out=s.a.splice(s.i);if(s.t==='cell')g.cells[s.x]=null;if(s.t==='col'&&s.a.length)s.a.at(-1).up=true;return out;}

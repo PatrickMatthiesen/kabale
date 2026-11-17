@@ -7,7 +7,7 @@ test('a denied storage getter still allows default art and preference changes', 
   const host={get localStorage(){throw new DOMException('Denied','SecurityError');}};
   const storage=getStorage(host);
   assert.equal(storage,null);
-  assert.deepEqual(loadArt(storage),{choice:'engraved',resolved:'engraved'});
+  assert.deepEqual(loadArt(storage,()=>0),{choice:'random',resolved:'engraved'});
   assert.doesNotThrow(()=>saveArt(storage,{choice:'woodcut',resolved:'woodcut'}));
 });
 
@@ -54,6 +54,11 @@ test('previous painted settings migrate to the requested woodcut style', () => {
 
 test('fixed preference ignores stale resolved art and invalid storage falls back safely', () => {
   assert.deepEqual(loadArt({ getItem: () => JSON.stringify({choice:'woodcut',resolved:'engraved'}) }), {choice:'woodcut',resolved:'woodcut'});
-  assert.deepEqual(loadArt({ getItem: () => '{bad' }), {choice:'engraved',resolved:'engraved'});
+  assert.deepEqual(loadArt({ getItem: () => '{bad' },()=>0), {choice:'random',resolved:'engraved'});
   assert.doesNotThrow(() => saveArt({ setItem() { throw Error('Unavailable'); } }, {choice:'woodcut',resolved:'woodcut'}));
+});
+
+test('a fresh art preference defaults to Random Deck without replacing saved choices', () => {
+  assert.deepEqual(loadArt({getItem:()=>null},()=>.99),{choice:'random',resolved:'woodcut'});
+  assert.deepEqual(loadArt({getItem:()=>JSON.stringify({choice:'engraved',resolved:'engraved'})},()=>.99),{choice:'engraved',resolved:'engraved'});
 });

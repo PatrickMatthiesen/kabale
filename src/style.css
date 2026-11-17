@@ -40,3 +40,10 @@
   #difficulty-note{display:none}#board{padding:12px 8px 20px;min-height:calc(100svh - 170px)}
   footer{margin-top:7px;min-height:24px;font-size:11px}
 }
+.card:not(:disabled){touch-action:none}.dragging-cards,.dragging-cards *{cursor:grabbing!important;user-select:none}.drag-source{opacity:.22;pointer-events:none}.drag-preview{position:fixed;z-index:10000;pointer-events:none;isolation:isolate}.drag-preview .card{opacity:1;pointer-events:none;transform:none;transition:none}.drop-target{outline:2px dashed #85ddd2;outline-offset:2px}.drop-hover{outline:3px solid #b8f6db;background-color:#92dccb22}.variant-setting{margin-top:18px}.variant-setting[hidden]{display:none}
+/* Use compact game controls in landscape phones and narrow tablet windows too. */
+@media(min-width:721px) and (max-width:1100px){
+ body{padding:0}.room{min-height:100svh;border:0;border-radius:0}.topbar{flex-wrap:wrap;min-height:0;padding:6px max(10px,env(safe-area-inset-right)) 6px max(10px,env(safe-area-inset-left));gap:6px}
+ .brand-mark,.brand-name small{display:none}.brand-name{font-size:17px}.brand{flex:0 0 auto;margin-right:auto}.stats{gap:10px}.stat small{font-size:7px}.stat b{font-size:13px}.toolbar{flex:1 1 auto;justify-content:flex-end;gap:3px}.tool-button{width:38px;height:36px;padding:0;flex-direction:column;gap:0;font-size:9px}.tool-button svg{width:15px;height:15px}.toolbar .primary{height:36px;font-size:12px;padding:0 10px}.toolbar .primary svg{display:none}
+ main{padding:6px max(8px,env(safe-area-inset-right)) 12px max(8px,env(safe-area-inset-left))}#modes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:0;margin-bottom:6px;overflow:visible}#modes button{min-width:0;padding:5px 3px;font-size:12px}#difficulty-note{display:none}#board{padding:12px 8px 20px}footer{margin-top:6px}
+}

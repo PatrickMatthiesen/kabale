@@ -42,3 +42,44 @@ test('Spider completed runs are neither hinted nor movable', () => {
   assert.equal(applyMove(g,'found:0','col:0'),false);
   assert.equal(JSON.stringify(g),before);
 });
+
+test('Klondike empty-column option moves any valid sequence only when enabled', () => {
+  const g=deal('klondike','normal',{emptyColumns:'any'});
+  const sequence=[{r:7,s:'♠',up:true,id:'7s'},{r:6,s:'♥',up:true,id:'6h'}];
+  g.cols=[sequence,[],[],[],[],[],[]];
+  assert.equal(canMove(g,0,1),true);
+  assert.equal(applyMove(g,'col:0:0','col:1'),true);
+  assert.equal(g.cols[1].length,2);
+  assert.equal(g.emptyColumns,'any');
+});
+
+test('Klondike empty-column option applies to waste cards and legal move hints', () => {
+  const g=deal('klondike','normal',{emptyColumns:'any'});
+  g.cols=Array.from({length:7},()=>[]);
+  g.waste=[{r:7,s:'♣',up:true,id:'waste-seven'}];
+  assert.ok(legalMoves(g).some(m=>m.from==='waste'&&m.to==='col:0'));
+  assert.equal(autoMove(g,'waste'),true);
+  assert.equal(g.cols[0][0].id,'waste-seven');
+});
+
+test('Klondike missing or invalid empty-column setting preserves King-only rules', () => {
+  const g=deal('klondike');
+  g.cols=[[{r:7,s:'♠',up:true,id:'7s'}],[],[],[],[],[],[]];
+  delete g.emptyColumns;
+  assert.equal(applyMove(g,'col:0','col:1'),false);
+  g.emptyColumns='unexpected';
+  assert.equal(legalMoves(g).some(m=>m.from==='col:0'&&m.to==='col:1'),false);
+  g.cols[0]=[{r:13,s:'♠',up:true,id:'ks'}];
+  assert.equal(applyMove(g,'col:0','col:1'),true);
+});
+
+test('empty-column option leaves FreeCell and Spider rules unchanged', () => {
+  const free=deal('freecell','normal',{emptyColumns:'kings'});
+  free.cols=Array.from({length:8},()=>[]);
+  free.cols[0]=[{r:7,s:'♠',up:true,id:'7s'}];
+  assert.equal(applyMove(free,'col:0','col:1'),true);
+  const spider=deal('spider','easy',{emptyColumns:'kings'});
+  spider.cols=Array.from({length:10},()=>[]);
+  spider.cols[0]=[{r:7,s:'♠',up:true,id:'7s'}];
+  assert.equal(applyMove(spider,'col:0','col:1'),true);
+});

@@ -3,14 +3,18 @@ import { loadArt, saveArt, resolveArt, cardFace, getStorage } from './card-art.j
 import { wasteLayout } from './waste-layout.js';
 import { hintRole as getHintRole } from './hints.js';
 import { boardLayout } from './board-layout.js';
+import { attachCardDrag } from './card-drag.js';
+import { loadEmptyColumns, saveEmptyColumns } from './game-settings.js';
 
 const storage = getStorage(window);
 const art = loadArt(storage);
+saveArt(storage,art);
+let emptyColumns = loadEmptyColumns(storage);
 
 const $ = id => document.getElementById(id);
 const names = { klondike: '7-kabale', spider: 'Spider', freecell: 'FreeCell', pyramid: 'Pyramid' };
 const storageKey = 'kabale-session-v3';
-let g = deal('klondike', 'normal');
+let g = deal('klondike', 'normal', { emptyColumns });
 let initial = structuredClone(g), past = [], future = [], selected = null, hint = null;
 let elapsed = 0, resumedAt = Date.now(), notice = '', lastClick = { key: '', time: 0 };
 let saveTimer;
@@ -23,7 +27,9 @@ try {
     elapsed = Number.isFinite(saved.elapsed) ? saved.elapsed : 0;
   }
 } catch { notice = 'Your saved game could not be loaded. A fresh table is ready.'; }
+if (g.mode === 'klondike') emptyColumns = g.emptyColumns ?? 'kings';
 const board = $('board');
+let cardDrag;
 let lastLayout = '';
 function fitBoard() {
   const style = getComputedStyle(board);
@@ -85,7 +91,7 @@ function tableau(col, i) {
 function summary() {
   const hard = g.difficulty === 'hard';
   const base = {
-    klondike: `Build alternating colors downward; only Kings fill empty columns. Foundations run Ace to King. Draw ${hard ? 'three' : 'one'}; recycle the stock freely.`,
+    klondike: `Build alternating colors downward; ${g.emptyColumns === 'any' ? 'any card or valid sequence may fill empty columns' : 'only Kings fill empty columns'}. Foundations run Ace to King. Draw ${hard ? 'three' : 'one'}; recycle the stock freely.`,
     spider: `Build downward in rank; move sequences of the same suit. Complete King-to-Ace runs in one suit. Fill every column before dealing. ${g.difficulty === 'easy' ? 'One suit' : hard ? 'Four suits' : 'Two suits'}.`,
     freecell: `Build alternating colors downward; any card may fill an empty column. ${hard ? 'Two' : 'Four'} free cells. Empty cells and columns determine how many cards you can move together. Foundations run Ace to King.`,
     pyramid: `Remove exposed pairs totaling 13; remove Kings alone. Clear the pyramid to win. Use the top waste card. ${g.difficulty === 'easy' ? 'Two redeals' : hard ? 'No redeals' : 'One redeal'}.`
@@ -93,12 +99,15 @@ function summary() {
   return base[g.mode];
 }
 function render() {
+  cardDrag?.cancel();
   const focusKey = document.activeElement?.dataset.key;
   board.dataset.art = art.resolved;
   $('card-art').value = art.choice;
   $('art-note').textContent = art.choice === 'random' ? (art.resolved === 'engraved' ? 'Engraved' : 'Woodcut') : '';
   $('modes').innerHTML = Object.entries(names).map(([mode, name]) => `<button type="button" data-mode="${mode}" aria-pressed="${g.mode === mode}" class="${g.mode === mode ? 'active' : ''}">${name}</button>`).join('');
   $('difficulty').value = g.difficulty || 'normal';
+  $('empty-columns').value = g.mode === 'klondike' ? (g.emptyColumns ?? 'kings') : emptyColumns;
+  $('klondike-options').hidden = g.mode !== 'klondike';
   $('moves').textContent = g.moves;
   $('undo').disabled = g.difficulty === 'hard' || !past.length;
   $('redo').disabled = g.difficulty === 'hard' || !future.length;
@@ -120,7 +129,7 @@ function render() {
   board.dataset.mode = g.mode;
   fitBoard();
   board.innerHTML = html;
-  $('message').textContent = g.won ? 'The table is cleared. Well played.' : notice || (selected ? 'Choose a destination. Escape cancels your selection.' : 'Double-click a card to move it automatically.');
+  $('message').textContent = g.won ? 'The table is cleared. Well played.' : notice || (selected ? 'Choose a destination. Escape cancels your selection.' : 'Drag a card, or select it and its destination.');
   if (focusKey) board.querySelector(`button[data-key="${focusKey}"]:not(:disabled)`)?.focus({preventScroll:true});
 }
 function action(fn) {
@@ -162,15 +171,20 @@ function undo(redo = false) {
   elapsed = clock(); to.push(structuredClone(g)); g = from.pop(); selected = null; hint = null; notice = redo ? 'Move restored.' : 'Move undone.';
   resumedAt = Date.now(); save(); render();
 }
-function fresh(mode = g.mode, difficulty = g.difficulty, restart = false) {
+function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyRule = emptyColumns) {
   if (g.moves && !g.won && !confirm(restart ? 'Restart this deal? Your moves will be cleared.' : 'Start a new deal? Your current game will be replaced.')) return false;
-  g = restart ? structuredClone(initial) : deal(mode,difficulty);
+  g = restart ? structuredClone(initial) : deal(mode,difficulty,{emptyColumns:emptyRule});
+  emptyColumns = g.mode === 'klondike' ? (g.emptyColumns ?? 'kings') : emptyRule;
+  saveEmptyColumns(storage,emptyColumns);
   if (!restart) { art.resolved = resolveArt(art.choice); saveArt(storage, art); }
   initial = structuredClone(g); past = []; future = []; selected = null; hint = null; elapsed = 0; resumedAt = Date.now(); notice = '';
   save(); render(); return true;
 }
 $('modes').onclick = e => { const mode=e.target.dataset.mode; if(mode && mode !== g.mode) fresh(mode); };
 $('difficulty').onchange = e => { if(!fresh(g.mode,e.target.value)) e.target.value=g.difficulty; };
+$('empty-columns').onchange = e => {
+  if (!fresh(g.mode,g.difficulty,false,e.target.value)) e.target.value=g.emptyColumns ?? 'kings';
+};
 $('card-art').onchange = e => {
   art.choice = e.target.value;
   art.resolved = resolveArt(art.choice);
@@ -189,6 +203,20 @@ $('hint').onclick = () => {
 };
 $('rules').onclick = () => $('rules-dialog').showModal();
 $('settings-open').onclick = () => $('settings-dialog').showModal();
+
+cardDrag = attachCardDrag(board, {
+  getMoves: () => g.won ? [] : legalMoves(g),
+  onStart: () => {
+    hint=null; selected=null; lastClick={key:'',time:0};
+    board.querySelectorAll('.hinted,.hint-source,.hint-destination,.selected').forEach(el=>el.classList.remove('hinted','hint-source','hint-destination','selected'));
+    $('message').textContent='Drop onto a highlighted destination. Escape cancels.';
+  },
+  onDrop: (from,to) => {
+    if (to) action(()=>applyMove(g,from,to));
+    else { notice='Move cancelled. Drop onto a highlighted destination.'; render(); }
+  },
+  onCancel: () => { notice='Move cancelled.'; $('message').textContent=notice; }
+});
 document.addEventListener('keydown', e => {
   if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName) || $('rules-dialog').open || $('settings-dialog').open) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(e.shiftKey); }

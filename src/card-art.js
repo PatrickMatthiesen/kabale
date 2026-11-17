@@ -26,7 +26,7 @@ export function resolveArt(choice, random = Math.random) {
   return artStyles.includes(choice) ? choice : artStyles[Math.floor(random() * artStyles.length)];
 }
 
-export function loadArt(storage) {
+export function loadArt(storage, random = Math.random) {
   try {
     const saved = JSON.parse(storage.getItem('kabale-card-art'));
     if (saved?.choice === 'painted') saved.choice = 'woodcut';
@@ -35,7 +35,7 @@ export function loadArt(storage) {
       return { choice: saved.choice, resolved: saved.choice === 'random' && artStyles.includes(saved.resolved) ? saved.resolved : resolveArt(saved.choice) };
     }
   } catch { /* Use the default when storage is unavailable or invalid. */ }
-  return { choice: 'engraved', resolved: 'engraved' };
+  return { choice: 'random', resolved: resolveArt('random', random) };
 }
 
 export function saveArt(storage, art) {
