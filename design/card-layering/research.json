@@ -103,6 +103,7 @@
     "id": "R4",
     "comparison": "R4-comparison.html",
     "prompt": "R4-prompt.json",
-    "intent": "Apply H3 flowing edge concept while keeping broad R2 royal figures. Existing H3/R2 preference retained."
+    "intent": "Apply H3 flowing edge concept while keeping broad R2 royal figures. Existing H3/R2 preference retained.",
+    "numberedPreview": "H3-R4-numbered.html"
   }
 }

@@ -58,7 +58,8 @@
         "R2",
         "H3"
       ],
-      "status": "New candidate, not a changed preference"
+      "status": "New candidate, not a changed preference",
+      "numberedPreview": "H3-R4-numbered.html"
     }
   ]
 }
