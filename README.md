@@ -30,7 +30,7 @@ In Settings, 7-kabale can use either Kings only or Any card for empty columns. C
 
 How to play explains the selected game's goal and rules, including its current challenge and empty-column setting.
 
-Hints mark a source with "Move" and a destination with "Here". Hints clear when you select a card and do not inspect hidden card values.
+Hints mark a source with "Move" and a destination with "Here". Hints clear when you select a card and do not inspect hidden card values. They prioritize foundation moves, uncovering cards, and freeing space, and skip previously visited positions, including equivalent empty-column and free-cell swaps. When only repeats remain, the game says no new hint was found; manual legal moves remain available. Hints suggest moves rather than guarantee a solution.
 
 Easy and Normal allow hints, undo, and redo. Hard disables those assists. Spider uses one, two, or four suits; Hard Klondike draws three cards; Hard FreeCell has two free cells; Pyramid has two, one, or zero stock redeals. Easy and Normal Klondike and FreeCell use the same dealing rules. Deals are shuffled, not guaranteed solvable.
 
