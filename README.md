@@ -40,6 +40,8 @@ Restart replays the same deal. New deal shuffles fresh cards. The current game, 
 
 Random Deck is the default for new preferences. You can also choose Engraved or Woodcut; existing saved choices are retained. Random chooses a style for a new deal and retains it across reloads. Both styles have complete generated faces for all 52 cards, with matching number-card decoration and integrated indices. Cards use a 9:14 display ratio.
 
+Small cards show larger text ranks and suits above a scaled illustration, making ten-column layouts readable on phones. Wider cards retain the full-face artwork. Stacked cards leave the larger labels visible, and dragged cards keep the same appearance.
+
 Source JPEG sheets are in `assets/cards/full/`. `bun run prepare:images` uses native `Bun.Image` to generate small (80 pixels per card), medium (160 pixels per card), and full-resolution WebP sheets in `assets/cards/optimized/`, with content hashes in their filenames. The generated `src/art-manifest.js` records their URLs and dimensions. Commit regenerated variants and the manifest when source artwork changes. The client chooses the smallest sufficient variant using displayed card width and device pixel ratio, and updates its choice when the layout changes.
 
 An artwork-only service worker stores requested hashed WebP images in browser Cache Storage, with a limit of 100 sheets. Unchanged images can be reused beyond GitHub Pages' ten-minute HTTP cache lifetime. Different bytes produce a different URL, so new artwork does not reuse old images. Browser storage eviction, private browsing or clearing site data can remove this cache. The worker does not cache HTML, scripts, stylesheets or game state; this is not full offline support.

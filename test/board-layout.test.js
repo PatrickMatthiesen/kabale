@@ -27,6 +27,15 @@ test('mobile card width remains determined by columns, even in a short viewport'
   assert.equal(boardLayout('spider',354,200).cardWidth,boardLayout('spider',354,900).cardWidth);
 });
 
+test('narrow Spider stacks expose enough space for readable ranks without horizontal overflow', () => {
+  for (const width of [260,274,300,336,354,390]) {
+    const layout = boardLayout('spider',width);
+    assert.ok(layout.faceStep >= 18, `rank strip is covered at ${width}px`);
+    assert.ok(layout.columns * layout.cardWidth + (layout.columns - 1) * layout.gap <= width);
+    assert.ok(layout.faceStep < layout.cardWidth * 14 / 9);
+  }
+});
+
 test('Spider and FreeCell use their actual column counts when switching games', () => {
   assert.equal(boardLayout('spider',354).columns,10);
   assert.equal(boardLayout('freecell',354).columns,8);
