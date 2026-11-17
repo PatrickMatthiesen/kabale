@@ -3,6 +3,7 @@
 assets/concepts/
 assets/cards/*.png
 assets/cards/full/*.png
+design/card-layering/*.png
 node_modules/
 _site/
 .env

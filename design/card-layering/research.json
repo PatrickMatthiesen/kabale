@@ -1,0 +1,82 @@
+{
+  "date": "2026-11-17",
+  "scope": "Research and illustration-only prototype. The live game and production decks are unchanged.",
+  "recommendation": {
+    "art": "Use artwork with no printed rank letters, digits, or small corner suit indices. Keep the central ornamental suit motif and full-size illustration.",
+    "values": "Render rank and suit from game state as independent text at fixed corners. Use a fine warm-paper halo where art is busy, rather than a full-width header or a flat opaque patch.",
+    "compact": "Use a rank at upper left and a suit at upper right so both fit within the exposed part of a narrow stacked card. Mirror the pair at the bottom.",
+    "scaling": "Change label size independently from artwork scale. Keep labels visible in stacks and cap size to prevent 10 and its suit from colliding.",
+    "limits": "Most reference games show larger cards or icons than a ten-column phone solitaire board. Their visual hierarchy transfers; their exact sizes do not. Inspection is for secondary details, not a replacement for readable ranks at rest."
+  },
+  "findings": [
+    {
+      "game": "Hearthstone",
+      "evidence": "Developer design retrospective",
+      "observation": "Elaborate frames distracted from attack, health and casting cost. The stated hierarchy became numeric values, title and art.",
+      "borrow": "Give gameplay values deliberate priority without shrinking the illustration into another frame.",
+      "url": "https://hearthstone.blizzard.com/en-us/news/13023802/hearthside-chat-art-with-ben-thompson-2-25-2014"
+    },
+    {
+      "game": "Magic: The Gathering",
+      "evidence": "Developer design retrospective",
+      "observation": "The redesigned frame gives power/toughness a light box and stronger contrast, while reducing frame area to enlarge art.",
+      "borrow": "Use localized contrast around important values, not a large new banner.",
+      "url": "https://magic.wizards.com/en/news/making-magic/frames-reference-2003-01-27"
+    },
+    {
+      "game": "Balatro",
+      "evidence": "Visual observation of official press-kit screenshots",
+      "observation": "Illustrated playing cards retain familiar corner rank/suit locations and large central illustrations.",
+      "borrow": "Keep fixed corner anchors and the normal full card face.",
+      "url": "https://www.playbalatro.com/press-kit/"
+    },
+    {
+      "game": "Factorio",
+      "evidence": "Developer quickbar article and its screenshot",
+      "observation": "Quickbar shortcuts show inventory counts over item icons. The screenshot uses compact high-contrast count labels.",
+      "borrow": "Let one visual asset coexist with changing values, using a fine outline for contrast.",
+      "url": "https://www.factorio.com/blog/post/fff-278"
+    },
+    {
+      "game": "Into the Breach",
+      "evidence": "Visual observation of publisher-provided screenshots",
+      "observation": "Tactical health and danger information is visually distinct from the textured map.",
+      "borrow": "Give essential information a consistent, high-contrast treatment and recognizable shapes.",
+      "url": "https://store.steampowered.com/app/590380/Into_The_Breach/"
+    },
+    {
+      "game": "Marvel Snap",
+      "evidence": "Official patch notes",
+      "observation": "The game has a Card Detail view, and the June 2024 notes document corrections to text that was too small.",
+      "borrow": "Use a separate detail view for secondary information while keeping primary values readable on the board.",
+      "url": "https://marvelsnap.com/patch-notes-june-04-2024/"
+    },
+    {
+      "game": "Diablo IV",
+      "evidence": "Developer accessibility article",
+      "observation": "Players can change game text size independently. Subtitles also have scaling, color and background-opacity controls.",
+      "borrow": "Scale information independently from illustrations and keep contrast tunable.",
+      "url": "https://news.blizzard.com/en-gb/article/23954932/combatting-demons-with-accessibility-in-diablo-iv"
+    }
+  ],
+  "evidenceLimit": "These are visual observations and documented design choices. They do not establish the games' internal DOM, sprite, canvas or texture implementation. Independent text rendering is the recommendation for Kabale.",
+  "sampleAssets": [
+    {
+      "file": "woodcut-court-art-only.png",
+      "optimized": "woodcut-court-art-only.webp",
+      "description": "Image-generator edit of existing J/Q/K sheet. Corner letters and small suit indices removed; central illustrations retained."
+    },
+    {
+      "file": "woodcut-heart-art-only.png",
+      "optimized": "woodcut-heart-art-only.webp",
+      "description": "Image-generator art-only floral heart sample. It can be reused for several ranks because the values are a separate layer."
+    }
+  ],
+  "prompts": "prompts.json",
+  "prototype": "prototype.html",
+  "checks": [
+    "HTML prototype rendered at phone width with no console errors.",
+    "Samples inspected for removed indices and retained illustrations.",
+    "No production app, engine, cache or artwork files changed."
+  ]
+}
