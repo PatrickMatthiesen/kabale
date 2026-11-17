@@ -47,6 +47,18 @@
       "name": "Large cutouts, narrow figures",
       "file": "woodcut-court-roomy-corners.webp",
       "feedback": "Too narrow"
+    },
+    {
+      "id": "R4",
+      "kind": "royals",
+      "name": "H3 flowing edge, broader figures",
+      "file": "R4-royals-flowing-edge.webp",
+      "source": "exec-cc652f9b-c143-4876-bd4d-d678b7c5192f.png",
+      "derivedFrom": [
+        "R2",
+        "H3"
+      ],
+      "status": "New candidate, not a changed preference"
     }
   ]
 }

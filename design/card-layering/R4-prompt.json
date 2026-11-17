@@ -1,0 +1,9 @@
+{
+  "id": "R4",
+  "tool": "Built-in image_gen",
+  "editTarget": "R2: woodcut-court-balanced-corners.png",
+  "edgeReference": "H3: woodcut-heart-roomy-corners.png",
+  "prompt": "Use case: precise-object-edit. Create variant R4 of the supplied woodcut royal card sheet using TWO references with different roles. Image 1 (R2 royal sheet) is the EDIT TARGET and defines the exact Jack, Queen and King identities, broad figure proportions, mirrored composition, clothing, hands, crowns, red/green/gold colors and cream paper. Image 2 (H3 floral heart card) is ONLY the EDGE/BORDER CONCEPT REFERENCE. Transfer H3's continuous thin dark-green rounded OUTER perimeter border and its naturally flowing inner contour: the clear top-left and bottom-right paper corners should feel shaped by the illustration's floral/garment curves, as in H3, rather than rectangular cutouts. IMPORTANT: keep R2's royal portraits broad, full and substantial. Do not compress or stretch the people into a narrow diagonal ribbon. Do not reduce the illustration to a tiny inset. Keep the R2 figures at roughly their current width and scale, and let fabric, leaves and flowers shape the curved transitions into the blank corners. It is fine for the royal corner pockets to be more moderate than the heart's if needed to preserve the broad figures. Keep faces, crowns and held objects intact. Separate the flowing inner art contour from the full outer perimeter like H3; avoid a hard frame that tightly squeezes the entire person. No ranks, letters, digits, small corner suit indices, UI labels or R4 text in the artwork. Preserve decorative hearts in the clothing. Output one complete sheet with EXACTLY three equal edge-to-edge columns, in Jack, Queen, King order, 1536 by 1024 pixels, with all cards fully visible and matching paper.",
+  "asset": "R4-royals-flowing-edge.png",
+  "optimized": "R4-royals-flowing-edge.webp"
+}
