@@ -20,13 +20,15 @@ bun test
 
 ## GitHub Pages
 
-Pushes to `main` run the Bun tests, assemble `_site` with `bun run build`, and deploy it to GitHub Pages. The site uses relative asset paths so it also works below the repository's `/kabale/` path. Only the game files and optimized runtime artwork are published; the Bun development server is not needed in production.
+Pushes to `main` run the Bun tests, assemble `_site` with `bun run build`, and deploy it to GitHub Pages. The site uses relative asset paths so it also works below the repository's `/kabale/` path. Published scripts and styles share a version derived from the build contents, so refreshed pages request matching modules. Only the game files and optimized runtime artwork are published; the Bun development server is not needed in production.
 
 ## Playing
 
 Drag a card or a valid sequence onto a highlighted destination using a mouse, pen, or touch. You can also select a card, then its destination. Double-click or double-tap a card to try an automatic move. With a card selected, press A for the same action. Press Escape to cancel selection or a drag. Ctrl+Z undoes a move; Ctrl+Shift+Z redoes it.
 
 In Settings, 7-kabale can use either Kings only or Any card for empty columns. Changing this rule starts a new game after confirmation, and the rule stays with that game through undo, restart, and reload.
+
+How to play explains the selected game's goal and rules, including its current challenge and empty-column setting.
 
 Hints mark a source with "Move" and a destination with "Here". Hints clear when you select a card and do not inspect hidden card values.
 

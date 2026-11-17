@@ -5,6 +5,7 @@ import { hintRole as getHintRole } from './hints.js';
 import { boardLayout } from './board-layout.js';
 import { attachCardDrag } from './card-drag.js';
 import { loadEmptyColumns, saveEmptyColumns } from './game-settings.js';
+import { gameRules } from './game-rules.js';
 import './register-cache.js';
 
 const storage = getStorage(window);
@@ -99,16 +100,6 @@ function tableau(col, i) {
   }).join('');
   return `<div class="col ${!col.length && hint?.to === `col:${i}` ? 'hinted hint-destination' : ''}" data-key="col:${i}" aria-label="Column ${i+1}, ${col.length} cards" style="min-height:calc(var(--card-h) + ${lastTop})">${cards || `<button class="empty empty-target" data-key="col:${i}" aria-label="Empty column ${i+1}"><span>Empty</span></button>`}</div>`;
 }
-function summary() {
-  const hard = g.difficulty === 'hard';
-  const base = {
-    klondike: `Build alternating colors downward; ${g.emptyColumns === 'any' ? 'any card or valid sequence may fill empty columns' : 'only Kings fill empty columns'}. Foundations run Ace to King. Draw ${hard ? 'three' : 'one'}; recycle the stock freely.`,
-    spider: `Build downward in rank; move sequences of the same suit. Complete King-to-Ace runs in one suit. Fill every column before dealing. ${g.difficulty === 'easy' ? 'One suit' : hard ? 'Four suits' : 'Two suits'}.`,
-    freecell: `Build alternating colors downward; any card may fill an empty column. ${hard ? 'Two' : 'Four'} free cells. Empty cells and columns determine how many cards you can move together. Foundations run Ace to King.`,
-    pyramid: `Remove exposed pairs totaling 13; remove Kings alone. Clear the pyramid to win. Use the top waste card. ${g.difficulty === 'easy' ? 'Two redeals' : hard ? 'No redeals' : 'One redeal'}.`
-  };
-  return base[g.mode];
-}
 function render() {
   cardDrag?.cancel();
   board.dataset.mode = g.mode;
@@ -126,7 +117,15 @@ function render() {
   $('redo').disabled = g.difficulty === 'hard' || !future.length;
   $('hint').disabled = g.difficulty === 'hard' || g.won;
   $('difficulty-note').textContent = g.difficulty === 'hard' ? 'Hard · no undo, redo or hints' : `${g.difficulty === 'easy' ? 'Easy' : 'Normal'} · undo and hints available`;
-  $('rule-summary').textContent = summary();
+  const rules = gameRules(g);
+  $('rules-title').textContent = `${rules.name} rules`;
+  $('rules-goal').textContent = rules.goal;
+  $('rules-list').replaceChildren(...rules.rules.map(text => {
+    const item = document.createElement('li');
+    item.textContent = text;
+    return item;
+  }));
+  $('rules-challenge').textContent = rules.challenge;
   let html;
   if (g.mode === 'pyramid') {
     html = g.cols.map((row, y) => `<div class="row pyramidrow">${row.map((c, x) => `<div class="pile pyramid-slot">${c ? card(c, `p:${y}:${x}`, 0, !pyramidPlayable(g,y,x)) : ''}</div>`).join('')}</div>`).join('');
