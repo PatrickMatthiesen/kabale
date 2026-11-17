@@ -1,1 +1,1 @@
-{"name":"kabale","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"node server.js","test":"node --test","build":"node scripts/build-pages.js"}}
+{"name":"kabale","version":"1.0.0","private":true,"type":"module","packageManager":"bun@1.4.4","engines":{"bun":">=1.4.4"},"scripts":{"dev":"bun server.js","test":"bun test","prepare:images":"bun scripts/prepare-images.js","build":"bun run prepare:images && bun scripts/build-pages.js"}}

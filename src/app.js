@@ -5,6 +5,7 @@ import { hintRole as getHintRole } from './hints.js';
 import { boardLayout } from './board-layout.js';
 import { attachCardDrag } from './card-drag.js';
 import { loadEmptyColumns, saveEmptyColumns } from './game-settings.js';
+import './register-cache.js';
 
 const storage = getStorage(window);
 const art = loadArt(storage);
@@ -30,19 +31,29 @@ try {
 if (g.mode === 'klondike') emptyColumns = g.emptyColumns ?? 'kings';
 const board = $('board');
 let cardDrag;
+let cardPixels = 160;
 let lastLayout = '';
+function refreshArtResolution() {
+  for (const image of board.querySelectorAll('.full-face[data-rank]')) {
+    const face=cardFace({r:Number(image.dataset.rank),s:image.dataset.suit},art.resolved,{cardWidth:cardPixels,pixelRatio:window.devicePixelRatio || 1});
+    const background=`url("${face.url}")`;
+    if (image.style.backgroundImage !== background) image.style.backgroundImage=background;
+  }
+}
 function fitBoard() {
   const style = getComputedStyle(board);
   const width = board.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   const boardTop = board.getBoundingClientRect().top + window.scrollY;
   const availableHeight = window.innerHeight - boardTop - 50;
-  const signature = `${g.mode}:${width}:${availableHeight}`;
+  const signature = `${g.mode}:${width}:${availableHeight}:${window.devicePixelRatio}`;
   if (signature === lastLayout || width <= 0) return;
   lastLayout = signature;
   const layout = boardLayout(g.mode, width, availableHeight);
+  cardPixels = layout.cardWidth;
   for (const [name,value] of Object.entries({ 'card-w':layout.cardWidth, 'layout-gap':layout.gap, 'face-step':layout.faceStep, 'back-step':layout.backStep })) {
     board.style.setProperty(`--${name}`, `${value}px`);
   }
+  refreshArtResolution();
 }
 new ResizeObserver(fitBoard).observe(board);
 window.addEventListener('resize', fitBoard);
@@ -67,8 +78,8 @@ function card(c, key, top = 0, blocked = false) {
   const hintRole = blocked ? '' : getHintRole(g, hint, key, face);
   const isHint = !!hintRole;
   const label = face ? `${rank(c)} of ${suitNames[c.s]}, ${sourceLabel(key)}` : `Face down card, ${sourceLabel(key)}`;
-  const image = face ? cardFace(c, art.resolved) : null;
-  const illustration = image ? `<span class="full-face" aria-hidden="true" style="background-image:url('${image.url}');background-size:${image.size};background-position:${image.position}"></span>` : '<span class="back-medallion" aria-hidden="true">K</span>';
+  const image = face ? cardFace(c, art.resolved,{cardWidth:cardPixels,pixelRatio:window.devicePixelRatio || 1}) : null;
+  const illustration = image ? `<span class="full-face" data-rank="${c.r}" data-suit="${c.s}" aria-hidden="true" style="background-image:url('${image.url}');background-size:${image.size};background-position:${image.position}"></span>` : '<span class="back-medallion" aria-hidden="true">K</span>';
   return `<button type="button" class="card ${face ? 'illustrated' : 'back'} ${face && ['♥','♦'].includes(c.s) ? 'red' : ''} ${isSelected ? 'selected' : ''} ${isHint ? 'hinted' : ''} ${hintRole}" style="top:${typeof top === 'number' ? `${top}px` : top}" data-key="${key}" aria-label="${label}" aria-pressed="${isSelected}" ${blocked || !face && key !== 'stock' ? 'disabled' : ''}>${illustration}</button>`;
 }
 function waste(cards, key) {
@@ -100,6 +111,8 @@ function summary() {
 }
 function render() {
   cardDrag?.cancel();
+  board.dataset.mode = g.mode;
+  fitBoard();
   const focusKey = document.activeElement?.dataset.key;
   board.dataset.art = art.resolved;
   $('card-art').value = art.choice;

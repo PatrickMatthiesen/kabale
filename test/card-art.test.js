@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadArt, resolveArt, saveArt, cardFace, getStorage } from '../src/card-art.js';
+import { loadArt, resolveArt, saveArt, cardFace, getStorage, selectArtVariant } from '../src/card-art.js';
+import { artManifest } from '../src/art-manifest.js';
 import { existsSync } from 'node:fs';
 
 test('a denied storage getter still allows default art and preference changes', () => {
@@ -24,13 +25,31 @@ test('every rank and suit maps to a unique complete face in both decks', () => {
 });
 
 test('sprite coordinates retain complete edge faces, including ten and king', () => {
-  assert.deepEqual(cardFace({r:10,s:'♥'},'woodcut'), {url:'./assets/cards/full/woodcut-hearts-numbers.jpg',size:'500% 200%',position:'100% 100%'});
-  assert.deepEqual(cardFace({r:13,s:'♠'},'engraved'), {url:'./assets/cards/full/engraved-spades-court.jpg',size:'300% 100%',position:'100% 0%'});
+  assert.deepEqual(cardFace({r:10,s:'♥'},'woodcut'), {url:artManifest['woodcut-hearts-numbers'][1].url,size:'500% 200%',position:'100% 100%'});
+  assert.deepEqual(cardFace({r:13,s:'♠'},'engraved'), {url:artManifest['engraved-spades-court'][1].url,size:'300% 100%',position:'100% 0%'});
 });
 
 test('card artwork resolves inside the GitHub Pages repository path', () => {
   const face=cardFace({r:1,s:'♠'},'engraved');
-  assert.equal(new URL(face.url,'https://patrickmatthiesen.github.io/kabale/').pathname,'/kabale/assets/cards/full/engraved-spades-numbers.jpg');
+  assert.equal(new URL(face.url,'https://patrickmatthiesen.github.io/kabale/').pathname,`/kabale/${face.url.slice(2)}`);
+});
+
+test('art resolution follows physical card pixels rather than device names', () => {
+  const variants=artManifest['engraved-clubs-court'];
+  assert.equal(selectArtVariant(variants,40,1),variants[0]);
+  assert.equal(selectArtVariant(variants,50,3),variants[1]);
+  assert.equal(selectArtVariant(variants,160,2),variants[2]);
+  assert.equal(selectArtVariant(variants,160,10),variants[2]);
+});
+
+test('every generated variant exists and its filename matches its bytes', async () => {
+  const { createHash }=await import('node:crypto');
+  for(const variants of Object.values(artManifest)) for(const variant of variants) {
+    const bytes=await Bun.file(new URL(`../${variant.url}`,import.meta.url)).bytes();
+    const hash=createHash('sha256').update(bytes).digest('hex').slice(0,16);
+    assert.ok(variant.url.endsWith(`.${hash}.webp`));
+    assert.equal(bytes.length,variant.bytes);
+  }
 });
 
 test('selected styles stay fixed; random can choose either approved style', () => {
