@@ -95,7 +95,11 @@ export function attachCardDrag(board, { getMoves, onStart, onDrop, onCancel }) {
   window.addEventListener('pointermove',move,{passive:false});
   window.addEventListener('pointerup',event=>finish(event));
   window.addEventListener('pointercancel',event=>finish(event,true));
-  board.addEventListener('lostpointercapture',event=>finish(event,true));
+  board.addEventListener('lostpointercapture',event=>{
+    // Touch starts with implicit capture on the card. Moving capture to the
+    // board releases that card and bubbles this event; the drag is still ours.
+    if (event.target === board) finish(event,true);
+  });
   window.addEventListener('blur',cleanup);
   window.addEventListener('resize',cleanup);
   return { cancel:cleanup };
