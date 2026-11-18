@@ -79,3 +79,40 @@
 .card.hinted::after,.pile.hinted:has(.empty-target)::after,.col.hint-destination:has(.empty-target)::after{top:0;right:0;transform:translateY(-50%);padding:var(--hint-pad-y) var(--hint-pad-x);border:1px solid #85ddd2;border-radius:6px;background:#174b42;color:#eafff9;box-shadow:0 2px 4px #061b1540;font:600 var(--hint-font)/1.2 'Segoe UI',sans-serif;white-space:nowrap}
 .pile.hint-source:has(.empty-target)::after{content:'Redeal'}.pile.hint-source .empty-target{font-size:var(--hint-font)}
 @media(pointer:coarse){.hint-feedback>button{flex-basis:44px;width:44px;height:44px;padding:12px}}
+
+.table-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 0 12px;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+.table-controls #modes { flex: 1; min-width: 0; margin-inline: 0; }
+#finish-game { flex: none; }
+#finish-game[hidden], #skip-finish[hidden] { display: none; }
+#skip-finish {
+  position: fixed;
+  z-index: 11001;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+}
+@media (max-width: 720px) {
+  .table-controls { flex-wrap: wrap; }
+  .table-controls #modes { flex-basis: 100%; }
+  #finish-game { margin: 0 0 8px auto; }
+}
+
+/* Decorative clones are separate from the playable board. */
+.card-motion-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+  contain: strict;
+}
+.card-motion-item { position: absolute; pointer-events: none; will-change: transform, opacity; }
+@media (prefers-reduced-motion: reduce) {
+  .card-motion-overlay { display: none; }
+}

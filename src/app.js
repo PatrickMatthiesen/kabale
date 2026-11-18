@@ -9,6 +9,7 @@ import { attachCardDrag } from './card-drag.js';
 import { loadEmptyColumns, saveEmptyColumns } from './game-settings.js';
 import { gameRules } from './game-rules.js';
 import { attachEndgameUI } from './endgame-ui.js';
+import { createCardMotion } from './card-motion.js';
 import './register-cache.js';
 
 const storage = getStorage(window);
@@ -39,6 +40,9 @@ if (g.mode === 'klondike') emptyColumns = g.emptyColumns ?? 'kings';
 restoreStockMemory([...past,g,...future.slice().reverse()]);
 let hintPositions = new Set([...past,g].map(hintVisitKey));
 const board = $('board');
+const motion = createCardMotion(board);
+let finishPlayback = null;
+let celebrating = false;
 let cardDrag;
 let cardPixels = 160;
 let lastLayout = '';
@@ -66,7 +70,11 @@ function fitBoard() {
   refreshArtResolution();
 }
 new ResizeObserver(fitBoard).observe(board);
-window.addEventListener('resize', fitBoard);
+window.addEventListener('resize', () => {
+  fitBoard();
+  if (finishPlayback) finishPlayback(false);
+  else motion.cancel();
+});
 const rank = c => ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'][c.r];
 const suitNames = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs' };
 const clock = () => elapsed + (g.won ? 0 : Date.now() - resumedAt);
@@ -110,7 +118,22 @@ function tableau(col, i) {
   }).join('');
   return `<div class="col ${!col.length && hint?.to === `col:${i}` ? 'hinted hint-destination' : ''}" data-key="col:${i}" aria-label="Column ${i+1}, ${col.length} cards" style="min-height:calc(var(--card-h) + ${lastTop})">${cards || `<button class="empty empty-target" data-key="col:${i}" aria-label="Empty column ${i+1}"><span>Empty</span></button>`}</div>`;
 }
-function render() {
+function renderBoard(display) {
+  let html;
+  if (display.mode === 'pyramid') {
+    html = display.cols.map((row, y) => `<div class="row pyramidrow">${row.map((c, x) => `<div class="pile pyramid-slot">${c ? card(c, `p:${y}:${x}`, 0, !pyramidPlayable(display,y,x)) : ''}</div>`).join('')}</div>`).join('');
+    html += '<div class="row stockrow">' + pile(display.stock.length ? card({up: false}, 'stock') : '', 'stock', display.stock.length ? `Stock · ${display.stock.length}` : 'Redeal') + waste(display.pairWaste, 'pw') + '</div>';
+  } else {
+    html = '<div class="row reserve-row">';
+    if (display.mode === 'freecell') html += display.cells.map((c,i) => pile(c ? card(c,`cell:${i}`) : '',`cell:${i}`,'Free cell')).join('');
+    else html += pile(display.stock.length ? card({up:false},'stock') : '', 'stock', display.stock.length ? `Stock · ${display.stock.length}` : 'Redeal') + (display.mode === 'klondike' ? waste(display.waste, 'waste') : '');
+    html += '<span class="reserve-spacer"></span>';
+    html += display.mode === 'spider' ? `<span class="run-counter">${display.found.length}<small>of 8 runs</small></span>` : display.found.map((f,i) => pile(f.length ? card(f.at(-1),`found:${i}`) : '',`found:${i}`,'Ace')).join('');
+    html += '</div><div class="row tableau">' + display.cols.map(tableau).join('') + '</div>';
+  }
+  board.innerHTML = html;
+}
+function render(newWin = false) {
   cardDrag?.cancel();
   board.dataset.mode = g.mode;
   fitBoard();
@@ -136,29 +159,63 @@ function render() {
     return item;
   }));
   $('rules-challenge').textContent = rules.challenge;
-  let html;
-  if (g.mode === 'pyramid') {
-    html = g.cols.map((row, y) => `<div class="row pyramidrow">${row.map((c, x) => `<div class="pile pyramid-slot">${c ? card(c, `p:${y}:${x}`, 0, !pyramidPlayable(g,y,x)) : ''}</div>`).join('')}</div>`).join('');
-    html += '<div class="row stockrow">' + pile(g.stock.length ? card({up: false}, 'stock') : '', 'stock', g.stock.length ? `Stock · ${g.stock.length}` : 'Redeal') + waste(g.pairWaste, 'pw') + '</div>';
-  } else {
-    html = '<div class="row reserve-row">';
-    if (g.mode === 'freecell') html += g.cells.map((c,i) => pile(c ? card(c,`cell:${i}`) : '',`cell:${i}`,'Free cell')).join('');
-    else html += pile(g.stock.length ? card({up:false},'stock') : '', 'stock', g.stock.length ? `Stock · ${g.stock.length}` : 'Redeal') + (g.mode === 'klondike' ? waste(g.waste, 'waste') : '');
-    html += '<span class="reserve-spacer"></span>';
-    html += g.mode === 'spider' ? `<span class="run-counter">${g.found.length}<small>of 8 runs</small></span>` : g.found.map((f,i) => pile(f.length ? card(f.at(-1),`found:${i}`) : '',`found:${i}`,'Ace')).join('');
-    html += '</div><div class="row tableau">' + g.cols.map(tableau).join('') + '</div>';
-  }
-  board.dataset.mode = g.mode;
-  fitBoard();
-  board.innerHTML = html;
+  renderBoard(g);
   $('message').textContent = g.won ? 'The table is cleared. Well played.' : notice || (selected ? 'Choose a destination. Escape cancels your selection.' : 'Drag a card, or select it and its destination.');
   $('message').setAttribute('aria-live',hintFeedback ? 'off' : 'polite');
   $('hint-feedback').hidden=!hintFeedback;
   $('hint-feedback-text').textContent=hintFeedback;
   if (focusKey) board.querySelector(`button[data-key="${focusKey}"]:not(:disabled)`)?.focus({preventScroll:true});
-  endgameUI?.update(g,{canUndo:past.length>0,time:$('time').textContent});
+  updateEndgame(newWin);
 }
-function action(fn) {
+function updateEndgame(newWin = false) {
+  endgameUI?.update(g,{canUndo:past.length>0,time:$('time').textContent,deferResult:celebrating,newWin});
+}
+function celebrate(previous) {
+  const winner = g;
+  celebrating = motion.enabled();
+  render(true);
+  if (celebrating) {
+    const showResult = () => {
+      if (g !== winner) return;
+      celebrating = false;
+      updateEndgame();
+    };
+    motion.win(previous).then(showResult,showResult);
+  }
+}
+async function playFinish(display, path, previous) {
+  $('game-room').inert = true;
+  $('skip-finish').hidden = false;
+  $('skip-finish').focus({preventScroll:true});
+  const complete = animateWin => {
+    if (finishPlayback !== complete) return;
+    finishPlayback = null;
+    motion.cancel();
+    $('game-room').inert = false;
+    $('skip-finish').hidden = true;
+    if (animateWin) celebrate(previous);
+    else render(true);
+  };
+  finishPlayback = complete;
+  const duration = Math.min(150,1600 / path.length);
+  try {
+    for (const {from,to} of path) {
+      const source = board.querySelector(`.card[data-key="${from}"]:not(.waste-ghost .card)`);
+      const target = board.querySelector(`[data-key="${to}"]`);
+      await motion.flight(source,target,{duration});
+      if (finishPlayback !== complete) return;
+      if (!motion.enabled()) { complete(false); return; }
+      if (!applyMove(display,from,to)) break;
+      renderBoard(display);
+    }
+    complete(true);
+  } catch {
+    // The verified final state has already been saved.
+    complete(false);
+  }
+}
+function action(fn, finishPlan = null) {
+  if (finishPlayback) return false;
   hintFeedback='';
   const before = structuredClone(g);
   if (!fn()) { notice = 'That move is not available. Choose another card or destination.'; render(); return false; }
@@ -167,7 +224,14 @@ function action(fn) {
   if (g.difficulty !== 'hard') hintPositions.add(hintVisitKey(g));
   future = []; selected = null; hint = null; notice = '';
   if (g.won) elapsed += Date.now() - resumedAt;
-  updateClock(); save(); render(); return true;
+  updateClock(); save();
+  if (g.won) {
+    cardDrag?.cancel();
+    const previous = motion.capture();
+    if (finishPlan && motion.enabled()) void playFinish(structuredClone(before),finishPlan,previous);
+    else celebrate(previous);
+  } else render();
+  return true;
 }
 function choose(key, automatic = false) {
   hintFeedback='';
@@ -200,16 +264,23 @@ board.addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(e.target.dataset.key); }
 });
 function undo(redo = false) {
-  if (g.difficulty === 'hard') return;
+  if (finishPlayback || g.difficulty === 'hard') return;
   const from = redo ? future : past, to = redo ? past : future;
   if (!from.length) return;
+  celebrating = false;
+  motion.cancel();
   hintFeedback='';
   elapsed = clock(); to.push(structuredClone(g)); g = from.pop(); selected = null; hint = null; notice = redo ? 'Move restored.' : 'Move undone.';
   hintPositions = new Set([...past,g].map(hintVisitKey));
   resumedAt = Date.now(); save(); render();
 }
-function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyRule = emptyColumns) {
+function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyRule = emptyColumns, animate = false) {
+  if (finishPlayback) return false;
   if (g.moves && !g.won && !confirm(restart ? 'Restart this deal? Your moves will be cleared.' : 'Start a new deal? Your current game will be replaced.')) return false;
+  celebrating = false;
+  motion.cancel();
+  cardDrag?.cancel();
+  const previous = animate ? motion.capture() : null;
   g = restart ? structuredClone(initial) : deal(mode,difficulty,{emptyColumns:emptyRule});
   rememberStock(g);
   emptyColumns = g.mode === 'klondike' ? (g.emptyColumns ?? 'kings') : emptyRule;
@@ -219,8 +290,11 @@ function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyR
   hintPositions = new Set([hintVisitKey(g)]);
   hintFeedback='';
   seenEndNotices.clear(); endgameUI?.reset();
-  save(); render(); return true;
+  updateClock(); save(); render();
+  if (previous) void motion.deal(previous).catch(()=>motion.cancel());
+  return true;
 }
+const newDeal = () => fresh(g.mode,g.difficulty,false,emptyColumns,true);
 $('modes').onclick = e => { const mode=e.target.dataset.mode; if(mode && mode !== g.mode) fresh(mode); };
 $('difficulty').onchange = e => { if(!fresh(g.mode,e.target.value)) e.target.value=g.difficulty; };
 $('empty-columns').onchange = e => {
@@ -232,7 +306,8 @@ $('card-art').onchange = e => {
   saveArt(storage, art);
   render();
 };
-$('new').onclick = () => fresh();
+$('new').onclick = newDeal;
+$('skip-finish').onclick = () => finishPlayback?.(false);
 $('restart').onclick = () => fresh(g.mode,g.difficulty,true);
 $('undo').onclick = () => undo();
 $('redo').onclick = () => undo(true);
@@ -277,29 +352,35 @@ cardDrag = attachCardDrag(board, {
   onCancel: () => { notice='Move cancelled.'; $('message').textContent=notice; }
 });
 document.addEventListener('keydown', e => {
+  if (finishPlayback) {
+    if (e.key === 'Escape') { e.preventDefault(); finishPlayback(false); }
+    return;
+  }
+  if (!celebrating) motion.cancel();
   if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName) || document.querySelector('dialog[open]')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(e.shiftKey); }
-  if (e.key === 'Escape') { selected = null; notice = ''; hintFeedback=''; render(); }
+  if (e.key === 'Escape') { motion.cancel(); selected = null; notice = ''; hintFeedback=''; render(); }
   if (e.key.toLowerCase() === 'a' && selected) { e.preventDefault(); choose(selected,true); }
 });
+document.addEventListener('pointerdown', () => {
+  if (!finishPlayback && !celebrating) motion.cancel();
+},true);
+window.addEventListener('scroll', () => {
+  if (finishPlayback) finishPlayback(false);
+  else motion.cancel();
+},{passive:true});
 function updateClock(){ const seconds=Math.floor(clock()/1000); $('time').textContent=`${Math.floor(seconds/60).toString().padStart(2,'0')}:${(seconds%60).toString().padStart(2,'0')}`; }
 endgameUI=attachEndgameUI({
   elements:Object.fromEntries(Object.entries({dialog:'end-dialog',actions:'end-actions',summary:'end-summary',finish:'finish-game',review:'end-review',close:'end-close',keep:'end-keep',undo:'end-undo',restart:'end-restart',newDeal:'end-new',title:'end-title',message:'end-message',stats:'end-stats'}).map(([key,id])=>[key,$(id)])),
   seen:seenEndNotices, onSeen:save, onUndo:()=>undo(),
-  onRestart:()=>fresh(g.mode,g.difficulty,true), onNew:()=>fresh(),
+  onRestart:()=>fresh(g.mode,g.difficulty,true), onNew:newDeal,
   onFinish:plan=>action(()=>{
     // Verify the complete sequence before touching the live game.
     const completed=structuredClone(g);
     for(const move of plan) if(!applyMove(completed,move.from,move.to)) return false;
     if(!completed.won) return false;
     g=completed; return true;
-  })
+  },plan)
 });
-for(const id of ['rules-dialog','settings-dialog']) $(id).addEventListener('close',()=>endgameUI.update(g,{canUndo:past.length>0,time:$('time').textContent}));
+for(const id of ['rules-dialog','settings-dialog']) $(id).addEventListener('close',()=>updateEndgame());
 setInterval(updateClock,1000); updateClock(); render();
-
-
-
-
-
-

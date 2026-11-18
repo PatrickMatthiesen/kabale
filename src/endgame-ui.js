@@ -18,7 +18,7 @@ export function attachEndgameUI({ elements: e, seen, onSeen, onUndo, onRestart, 
   e.newDeal.onclick=()=>{if(onNew()) close();};
   e.finish.onclick=()=>{if(plan?.length) onFinish(plan);};
   return {
-    update(current, { canUndo, time }) {
+    update(current, { canUndo, time, deferResult = false, newWin = false }) {
       game=current;
       if (cachedGame!==game || cachedMoves!==game.moves) {
         cachedGame=game; cachedMoves=game.moves;
@@ -26,10 +26,9 @@ export function attachEndgameUI({ elements: e, seen, onSeen, onUndo, onRestart, 
         plan=outcome.kind==='playing' ? completionPlan(game) : null;
       }
       const ended=outcome.kind!=='playing';
-      e.actions.hidden=!ended&&!plan;
+      e.actions.hidden=!ended||deferResult;
       e.finish.hidden=!plan;
-      e.review.hidden=!ended;
-      e.summary.textContent=ended ? outcome.title : 'The remaining cards can be cleared.';
+      e.summary.textContent=outcome.title;
       e.review.textContent=outcome.kind==='won' ? 'View result' : 'Review options';
       e.dialog.dataset.outcome=outcome.kind;
       e.title.textContent=outcome.title;
@@ -45,6 +44,8 @@ export function attachEndgameUI({ elements: e, seen, onSeen, onUndo, onRestart, 
       e.keep.textContent=outcome.kind==='won' ? 'Back to the table' : 'Keep playing';
       if (!ended) { if(e.dialog.open) close(); return; }
       const key=`${game.difficulty}:${outcome.kind}:${hintPosition(game)}`;
+      if (newWin && outcome.kind==='won') seen.delete(key);
+      if (deferResult) return;
       if (!seen.has(key)) {
         // Do not steal focus from rules/settings; reconsider when those close.
         if (e.dialog.ownerDocument?.querySelector('dialog[open]') && !e.dialog.open) return;

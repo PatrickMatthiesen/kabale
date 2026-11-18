@@ -12,6 +12,7 @@ import {wasteLayout} from '../src/waste-layout.js';
 import {boardLayout} from '../src/board-layout.js';
 import {gameRules} from '../src/game-rules.js';
 import {attachEndgameUI} from '../src/endgame-ui.js';
+import {createCardMotion} from '../src/card-motion.js';
 
 const source=(await readFile(new URL('../src/app.js',import.meta.url),'utf8')).replace(/^import .*\r?\n/gm,'');
 const dragSource=(await readFile(new URL('../src/card-drag.js',import.meta.url),'utf8')).replace('export function attachCardDrag','function attachCardDrag');
@@ -19,7 +20,7 @@ const c=(r,s='♠')=>({r,s,id:`${s}${r}`,up:true});
 function board(difficulty='normal') {
   const g=engine.deal('klondike',difficulty);g.cols=[[c(7)],[],[],[],[],[],[]];g.stock=[];g.waste=[];g.moves=12;return g;
 }
-function app(game,stored=new Map()) {
+function app(game,stored=new Map(),motionFactory=createCardMotion) {
   if(game)stored.set('kabale-session-v3',JSON.stringify({version:3,game,initial:game,past:[],future:[],elapsed:120000}));
   const elements=new Map();
   const document={activeElement:null,addEventListener(){},body:{classList:{add(){},remove(){}},append(){}},querySelector:()=>[...elements.values()].find(e=>e.open)??null};
@@ -30,7 +31,7 @@ function app(game,stored=new Map()) {
   }
   document.getElementById=id=>{if(!elements.has(id))elements.set(id,el(id));return elements.get(id);};
   document.createElement=()=>el();
-  const context={...engine,...art,...hints,...settings,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,planKlondikeHint,rememberStock,restoreStockMemory,document,
+  const context={...engine,...art,...hints,...settings,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,planKlondikeHint,rememberStock,restoreStockMemory,createCardMotion:motionFactory,document,
     window:{localStorage:{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v)},devicePixelRatio:1,innerHeight:1000,scrollY:0,addEventListener(){}},
     getComputedStyle:()=>({paddingLeft:'8px',paddingRight:'8px'}),ResizeObserver:class{observe(){}},confirm:()=>true,
     setTimeout:()=>1,clearTimeout(){},setInterval(){},Date,console,structuredClone};
@@ -50,6 +51,55 @@ test('real app finishes, saves final time/moves, and can undo the complete clean
   assert.equal(h.api.state().won,false);assert.equal(h.api.state().moves,12);
   assert.equal(h.get('end-dialog').open,false);assert.equal(h.get('finish-game').hidden,false);
   h.get('redo').onclick();assert.equal(h.api.state().won,true);assert.equal(h.get('end-dialog').open,false);
+});
+
+test('the photographed exposed tableau offers Finish game above the board',async()=>{
+  const rank={A:1,J:11,Q:12,K:13};
+  const pile=tokens=>tokens.split(' ').filter(Boolean).map(token=>{
+    const label=token.slice(0,-1);
+    return c(rank[label]??Number(label),token.at(-1));
+  });
+  const g=board('easy');
+  g.cols=[
+    pile('K♥ Q♠ J♥ 10♠ 9♦ 8♣ 7♦ 6♣ 5♦ 4♣ 3♥'),
+    pile('K♠ Q♦ J♣ 10♦ 9♣ 8♦ 7♠ 6♦ 5♣ 4♦'),
+    [],pile('K♣ Q♥ J♠ 10♥ 9♠ 8♥ 7♣ 6♥ 5♠ 4♥'),
+    pile('6♠'),pile('5♥'),pile('K♦ Q♣ J♦ 10♣ 9♥ 8♠ 7♥')
+  ];
+  g.found=[pile('A♠ 2♠ 3♠ 4♠'),pile('A♦ 2♦ 3♦'),pile('A♣ 2♣ 3♣'),pile('A♥ 2♥')];
+  const fixture=[...g.cols.flat(),...g.found.flat()];
+  assert.equal(fixture.length,52);
+  assert.equal(new Set(fixture.map(card=>card.id)).size,52);
+  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+  assert.ok(html.indexOf('id="finish-game"')<html.indexOf('id="board"'));
+  const h=app(g);
+  assert.equal(h.get('finish-game').hidden,false);
+  h.get('finish-game').onclick();
+  assert.equal(h.api.state().won,true);
+  assert.equal(h.api.state().moves,g.moves+40);
+});
+
+test('finish saves the complete win before playback, and skipping preserves the original undo board',async()=>{
+  const g=board();g.found=['♠','♥','♦','♣'].map(s=>Array.from({length:12},(_,i)=>c(i+1,s)));
+  g.cols=['♠','♥','♦','♣'].map(s=>[c(13,s)]);
+  const flights=[];
+  const motion={enabled:()=>true,capture:()=>({}),flight:()=>new Promise(resolve=>flights.push(resolve)),cancel:()=>flights.splice(0).forEach(resolve=>resolve())};
+  const h=app(g,new Map(),()=>motion);
+  h.get('finish-game').onclick();
+  assert.equal(h.api.state().won,true);
+  assert.equal(h.get('game-room').inert,true);
+  assert.equal(h.get('end-dialog').open,false);
+  h.api.flush();
+  assert.equal(JSON.parse(h.stored.get('kabale-session-v3')).game.won,true);
+  flights.shift()();
+  await Promise.resolve();
+  h.get('skip-finish').onclick();
+  assert.equal(h.get('game-room').inert,false);
+  assert.equal(h.get('skip-finish').hidden,true);
+  assert.equal(h.get('end-dialog').open,true);
+  h.get('end-keep').onclick();h.get('undo').onclick();
+  assert.deepEqual(h.api.state().cols,g.cols);
+  assert.deepEqual(h.api.state().found,g.found);
 });
 
 test('real app persists dismissed dead ends and starts a fresh deal through recovery',()=>{
