@@ -20,6 +20,7 @@ const storageKey = 'kabale-session-v3';
 let g = deal('klondike', 'normal', { emptyColumns });
 let initial = structuredClone(g), past = [], future = [], selected = null, hint = null;
 let elapsed = 0, resumedAt = Date.now(), notice = '', lastClick = { key: '', time: 0 };
+let hintFeedback = '';
 let saveTimer;
 let seenEndNotices = new Set();
 try {
@@ -93,7 +94,8 @@ function waste(cards, key) {
   return `<div class="pile waste-pile" data-key="${key}">${wasteLayout(cards).map((layer,i) => `<div class="waste-layer ${layer.top ? 'waste-top' : 'waste-ghost'}" style="transform:translate(${layer.x}px,${layer.y}px) rotate(${layer.angle}deg);z-index:${i}" ${layer.top ? '' : 'aria-hidden="true" inert'}>${card(layer.card,key,0,!layer.top)}</div>`).join('')}</div>`;
 }
 function pile(contents, key, label) {
-  return `<div class="pile ${!contents && hint?.to === key ? 'hinted hint-destination' : ''}" data-key="${key}">${contents || `<button class="placeholder empty-target" data-key="${key}" aria-label="${label || sourceLabel(key)}">${label || 'Empty'}</button>`}</div>`;
+  const role = !contents ? (key==='stock' && hint?.from===key ? 'hint-source' : hint?.to===key ? 'hint-destination' : '') : '';
+  return `<div class="pile ${role ? `hinted ${role}` : ''}" data-key="${key}">${contents || `<button class="placeholder empty-target" data-key="${key}" aria-label="${label || sourceLabel(key)}">${label || 'Empty'}</button>`}</div>`;
 }
 function tableau(col, i) {
   let faceSteps = 0, backSteps = 0, lastTop = '0px';
@@ -147,10 +149,14 @@ function render() {
   fitBoard();
   board.innerHTML = html;
   $('message').textContent = g.won ? 'The table is cleared. Well played.' : notice || (selected ? 'Choose a destination. Escape cancels your selection.' : 'Drag a card, or select it and its destination.');
+  $('message').setAttribute('aria-live',hintFeedback ? 'off' : 'polite');
+  $('hint-feedback').hidden=!hintFeedback;
+  $('hint-feedback-text').textContent=hintFeedback;
   if (focusKey) board.querySelector(`button[data-key="${focusKey}"]:not(:disabled)`)?.focus({preventScroll:true});
   endgameUI?.update(g,{canUndo:past.length>0,time:$('time').textContent});
 }
 function action(fn) {
+  hintFeedback='';
   const before = structuredClone(g);
   if (!fn()) { notice = 'That move is not available. Choose another card or destination.'; render(); return false; }
   if (g.difficulty !== 'hard') { past.push(before); if (past.length > 100) past.shift(); }
@@ -161,6 +167,7 @@ function action(fn) {
   updateClock(); save(); render(); return true;
 }
 function choose(key, automatic = false) {
+  hintFeedback='';
   hint = null;
   if (g.won) return;
   if (key === 'stock') {
@@ -193,6 +200,7 @@ function undo(redo = false) {
   if (g.difficulty === 'hard') return;
   const from = redo ? future : past, to = redo ? past : future;
   if (!from.length) return;
+  hintFeedback='';
   elapsed = clock(); to.push(structuredClone(g)); g = from.pop(); selected = null; hint = null; notice = redo ? 'Move restored.' : 'Move undone.';
   hintPositions = new Set([...past,g].map(hintPosition));
   resumedAt = Date.now(); save(); render();
@@ -205,6 +213,7 @@ function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyR
   if (!restart) { art.resolved = resolveArt(art.choice); saveArt(storage, art); }
   initial = structuredClone(g); past = []; future = []; selected = null; hint = null; elapsed = 0; resumedAt = Date.now(); notice = '';
   hintPositions = new Set([hintPosition(g)]);
+  hintFeedback='';
   seenEndNotices.clear(); endgameUI?.reset();
   save(); render(); return true;
 }
@@ -225,16 +234,21 @@ $('undo').onclick = () => undo();
 $('redo').onclick = () => undo(true);
 $('hint').onclick = () => {
   if (g.difficulty === 'hard') return;
+  selected=null;
   hint = selectHint(g,hintPositions);
-  notice = hint ? (hint.from === 'stock' ? 'Draw from the stock.' : `${hint.label}: ${sourceLabel(hint.from)} to ${sourceLabel(hint.to || hint.from)}.`) : legalMoves(g).length ? 'No new hint found. You may still be able to find another approach.' : 'No legal moves remain from this position.';
+  notice = hint ? (hint.from === 'stock' ? (g.stock.length ? 'Draw from the stock.' : 'Recycle the waste into the stock.') : `${hint.label}: ${sourceLabel(hint.from)} to ${sourceLabel(hint.to || hint.from)}.`) : legalMoves(g).length ? 'No new hint found. Try another approach or undo a move. This does not mean the deal is lost.' : 'No legal moves remain from this position.';
+  hintFeedback=notice;
   render();
 };
+$('hint-feedback-close').onclick=()=>{hintFeedback='';render();};
 $('rules').onclick = () => $('rules-dialog').showModal();
 $('settings-open').onclick = () => $('settings-dialog').showModal();
 
 cardDrag = attachCardDrag(board, {
   getMoves: () => g.won ? [] : legalMoves(g),
   onStart: () => {
+    hintFeedback=''; $('hint-feedback').hidden=true;
+    $('message').setAttribute('aria-live','polite');
     hint=null; selected=null; lastClick={key:'',time:0};
     board.querySelectorAll('.hinted,.hint-source,.hint-destination,.selected').forEach(el=>el.classList.remove('hinted','hint-source','hint-destination','selected'));
     $('message').textContent='Release to place the card. Escape cancels.';
@@ -248,7 +262,7 @@ cardDrag = attachCardDrag(board, {
 document.addEventListener('keydown', e => {
   if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName) || document.querySelector('dialog[open]')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(e.shiftKey); }
-  if (e.key === 'Escape') { selected = null; notice = ''; render(); }
+  if (e.key === 'Escape') { selected = null; notice = ''; hintFeedback=''; render(); }
   if (e.key.toLowerCase() === 'a' && selected) { e.preventDefault(); choose(selected,true); }
 });
 function updateClock(){ const seconds=Math.floor(clock()/1000); $('time').textContent=`${Math.floor(seconds/60).toString().padStart(2,'0')}:${(seconds%60).toString().padStart(2,'0')}`; }

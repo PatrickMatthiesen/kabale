@@ -23,7 +23,7 @@ function app(game,stored=new Map()) {
   const document={activeElement:null,addEventListener(){},body:{classList:{add(){},remove(){}},append(){}},querySelector:()=>[...elements.values()].find(e=>e.open)??null};
   function el(id='') {
     return {id,dataset:{},open:false,hidden:false,disabled:false,style:{setProperty(){}},classList:{toggle(){},add(){},remove(){}},ownerDocument:document,
-      clientWidth:600,querySelectorAll:()=>[],querySelector:()=>null,getBoundingClientRect:()=>({top:0}),replaceChildren(){},addEventListener(){},focus(){},
+      clientWidth:600,querySelectorAll:()=>[],querySelector:()=>null,getBoundingClientRect:()=>({top:0}),replaceChildren(){},addEventListener(){},focus(){},setAttribute(name,value){this[name]=value;},
       showModal(){this.open=true;},close(){this.open=false;}};
   }
   document.getElementById=id=>{if(!elements.has(id))elements.set(id,el(id));return elements.get(id);};
@@ -72,5 +72,30 @@ test('Spider explains a blocked deal without declaring the board lost',()=>{
   const h=app(g),stock=g.stock.length;h.api.choose('stock');
   assert.equal(h.api.state().stock.length,stock);
   assert.equal(h.get('message').textContent,'Fill every empty column before dealing from the stock.');
+  assert.equal(h.get('end-dialog').open,false);
+});
+
+test('Hint gives visible feedback when all remaining suggestions repeat, without declaring a loss',()=>{
+  const g=board();g.stock=[{...c(9,'♥'),up:false}];
+  const h=app(g);
+  // Following the only available stock action reaches a state whose recycle
+  // would revisit the starting position. The footer can be below a long table.
+  h.api.choose('stock');h.get('hint').onclick();
+  assert.equal(h.get('hint-feedback').hidden,false);
+  assert.match(h.get('hint-feedback-text').textContent,/No new hint found/);
+  assert.equal(h.get('end-dialog').open,false);
+  assert.equal(h.get('message')['aria-live'],'off');
+  h.get('hint-feedback-close').onclick();assert.equal(h.get('hint-feedback').hidden,true);
+  assert.equal(h.get('message')['aria-live'],'polite');
+  h.get('hint').onclick();h.api.choose('col:0:0');
+  assert.equal(h.get('hint-feedback').hidden,true);
+});
+
+test('a stock recycle hint marks the empty Redeal pile and explains its action',()=>{
+  const g=board();g.waste=[c(9,'♥')];
+  const h=app(g);h.get('hint').onclick();
+  assert.equal(h.get('hint-feedback').hidden,false);
+  assert.equal(h.get('hint-feedback-text').textContent,'Recycle the waste into the stock.');
+  assert.match(h.get('board').innerHTML,/class="pile hinted hint-source" data-key="stock"/);
   assert.equal(h.get('end-dialog').open,false);
 });
