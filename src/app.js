@@ -6,6 +6,7 @@ import { boardLayout } from './board-layout.js';
 import { attachCardDrag } from './card-drag.js';
 import { loadEmptyColumns, saveEmptyColumns } from './game-settings.js';
 import { gameRules } from './game-rules.js';
+import { attachEndgameUI } from './endgame-ui.js';
 import './register-cache.js';
 
 const storage = getStorage(window);
@@ -20,6 +21,7 @@ let g = deal('klondike', 'normal', { emptyColumns });
 let initial = structuredClone(g), past = [], future = [], selected = null, hint = null;
 let elapsed = 0, resumedAt = Date.now(), notice = '', lastClick = { key: '', time: 0 };
 let saveTimer;
+let seenEndNotices = new Set();
 try {
   const saved = storage ? JSON.parse(storage.getItem(storageKey)) : null;
   if (saved?.version === 3 && names[saved.game?.mode] && Array.isArray(saved.game.cols) && saved.initial) {
@@ -27,6 +29,7 @@ try {
     past = g.difficulty === 'hard' ? [] : (saved.past || []).slice(-100);
     future = g.difficulty === 'hard' ? [] : (saved.future || []).slice(-100);
     elapsed = Number.isFinite(saved.elapsed) ? saved.elapsed : 0;
+    seenEndNotices = new Set(Array.isArray(saved.seenEndNotices) ? saved.seenEndNotices.filter(k=>typeof k==='string') : []);
   }
 } catch { notice = 'Your saved game could not be loaded. A fresh table is ready.'; }
 if (g.mode === 'klondike') emptyColumns = g.emptyColumns ?? 'kings';
@@ -35,6 +38,7 @@ const board = $('board');
 let cardDrag;
 let cardPixels = 160;
 let lastLayout = '';
+let endgameUI;
 function refreshArtResolution() {
   for (const image of board.querySelectorAll('.full-face[data-rank]')) {
     const face=cardFace({r:Number(image.dataset.rank),s:image.dataset.suit},art.resolved,{cardWidth:cardPixels,pixelRatio:window.devicePixelRatio || 1});
@@ -64,7 +68,7 @@ const suitNames = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 
 const clock = () => elapsed + (g.won ? 0 : Date.now() - resumedAt);
 function saveNow() {
   clearTimeout(saveTimer);
-  try { storage.setItem(storageKey, JSON.stringify({version: 3, game: g, initial, past, future, elapsed: clock()})); }
+  try { storage.setItem(storageKey, JSON.stringify({version: 3, game: g, initial, past, future, elapsed: clock(), seenEndNotices:[...seenEndNotices]})); }
   catch { notice = 'Browser storage is unavailable. Keep this tab open to retain your game.'; $('message').textContent = notice; }
 }
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 120); }
@@ -144,6 +148,7 @@ function render() {
   board.innerHTML = html;
   $('message').textContent = g.won ? 'The table is cleared. Well played.' : notice || (selected ? 'Choose a destination. Escape cancels your selection.' : 'Drag a card, or select it and its destination.');
   if (focusKey) board.querySelector(`button[data-key="${focusKey}"]:not(:disabled)`)?.focus({preventScroll:true});
+  endgameUI?.update(g,{canUndo:past.length>0,time:$('time').textContent});
 }
 function action(fn) {
   const before = structuredClone(g);
@@ -153,12 +158,17 @@ function action(fn) {
   hintPositions.add(hintPosition(g));
   future = []; selected = null; hint = null; notice = '';
   if (g.won) elapsed += Date.now() - resumedAt;
-  save(); render(); return true;
+  updateClock(); save(); render(); return true;
 }
 function choose(key, automatic = false) {
   hint = null;
   if (g.won) return;
-  if (key === 'stock') { action(() => applyMove(g,'stock','stock')); return; }
+  if (key === 'stock') {
+    if (g.mode==='spider' && g.stock.length && g.cols.some(col=>!col.length)) {
+      notice='Fill every empty column before dealing from the stock.'; render(); return;
+    }
+    action(() => applyMove(g,'stock','stock')); return;
+  }
   if (automatic) { action(() => autoMove(g,key)); return; }
   if (g.mode === 'pyramid' && legalMoves(g).some(m => m.from === key && m.to === key)) { action(() => applyMove(g,key,key)); return; }
   if (key === selected) { selected = null; notice = ''; render(); return; }
@@ -195,6 +205,7 @@ function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyR
   if (!restart) { art.resolved = resolveArt(art.choice); saveArt(storage, art); }
   initial = structuredClone(g); past = []; future = []; selected = null; hint = null; elapsed = 0; resumedAt = Date.now(); notice = '';
   hintPositions = new Set([hintPosition(g)]);
+  seenEndNotices.clear(); endgameUI?.reset();
   save(); render(); return true;
 }
 $('modes').onclick = e => { const mode=e.target.dataset.mode; if(mode && mode !== g.mode) fresh(mode); };
@@ -215,7 +226,7 @@ $('redo').onclick = () => undo(true);
 $('hint').onclick = () => {
   if (g.difficulty === 'hard') return;
   hint = selectHint(g,hintPositions);
-  notice = hint ? (hint.from === 'stock' ? 'Draw from the stock.' : `${hint.label}: ${sourceLabel(hint.from)} to ${sourceLabel(hint.to || hint.from)}.`) : legalMoves(g).length ? 'No new hint found. Remaining moves repeat an earlier position. Try another approach or undo a move.' : 'No legal moves remain. Undo a move or try a new deal.';
+  notice = hint ? (hint.from === 'stock' ? 'Draw from the stock.' : `${hint.label}: ${sourceLabel(hint.from)} to ${sourceLabel(hint.to || hint.from)}.`) : legalMoves(g).length ? 'No new hint found. You may still be able to find another approach.' : 'No legal moves remain from this position.';
   render();
 };
 $('rules').onclick = () => $('rules-dialog').showModal();
@@ -235,12 +246,25 @@ cardDrag = attachCardDrag(board, {
   onCancel: () => { notice='Move cancelled.'; $('message').textContent=notice; }
 });
 document.addEventListener('keydown', e => {
-  if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName) || $('rules-dialog').open || $('settings-dialog').open) return;
+  if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName) || document.querySelector('dialog[open]')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(e.shiftKey); }
   if (e.key === 'Escape') { selected = null; notice = ''; render(); }
   if (e.key.toLowerCase() === 'a' && selected) { e.preventDefault(); choose(selected,true); }
 });
 function updateClock(){ const seconds=Math.floor(clock()/1000); $('time').textContent=`${Math.floor(seconds/60).toString().padStart(2,'0')}:${(seconds%60).toString().padStart(2,'0')}`; }
+endgameUI=attachEndgameUI({
+  elements:Object.fromEntries(Object.entries({dialog:'end-dialog',actions:'end-actions',summary:'end-summary',finish:'finish-game',review:'end-review',close:'end-close',keep:'end-keep',undo:'end-undo',restart:'end-restart',newDeal:'end-new',title:'end-title',message:'end-message',stats:'end-stats'}).map(([key,id])=>[key,$(id)])),
+  seen:seenEndNotices, onSeen:save, onUndo:()=>undo(),
+  onRestart:()=>fresh(g.mode,g.difficulty,true), onNew:()=>fresh(),
+  onFinish:plan=>action(()=>{
+    // Verify the complete sequence before touching the live game.
+    const completed=structuredClone(g);
+    for(const move of plan) if(!applyMove(completed,move.from,move.to)) return false;
+    if(!completed.won) return false;
+    g=completed; return true;
+  })
+});
+for(const id of ['rules-dialog','settings-dialog']) $(id).addEventListener('close',()=>endgameUI.update(g,{canUndo:past.length>0,time:$('time').textContent}));
 setInterval(updateClock,1000); updateClock(); render();
 
 

@@ -34,6 +34,10 @@ Hints mark a source with "Move" and a destination with "Here". Hints clear when 
 
 Easy and Normal allow hints, undo, and redo. Hard disables those assists. Spider uses one, two, or four suits; Hard Klondike draws three cards; Hard FreeCell has two free cells; Pyramid has two, one, or zero stock redeals. Easy and Normal Klondike and FreeCell use the same dealing rules. Deals are shuffled, not guaranteed solvable.
 
+A dead-end notice appears only when no legal move, draw, or permitted stock recycle remains. It is separate from a hint failing to find a suggestion. Easy includes a short explanation; Easy and Normal offer Undo when history is available, while Hard offers replay and a new deal without enabling assists. Dismissed results stay dismissed for that position across reloads, and Review options reopens them. The board remains available after dismissal. Spider explains that empty columns must be filled before dealing.
+
+Finish game appears on any difficulty only when a complete cleanup sequence has been verified. Klondike and FreeCell use foundation-only moves with no hidden cards or stock remaining; exposed waste and free-cell cards can participate. Spider offers cleanup when every move completes a run. Pyramid offers an immediate finish for the final one or two pyramid cards, without requiring the stock to be cleared. This is conservative cleanup, not a general solver. On Easy and Normal, one Undo reverses the cleanup. A win shows final time and moves with replay and new-deal choices.
+
 Restart replays the same deal. New deal shuffles fresh cards. The current game, up to 100 undo states, and card-art settings are saved in this browser's local storage. There is no account or server-side saved game.
 
 ## Card artwork
