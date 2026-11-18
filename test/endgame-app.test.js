@@ -5,6 +5,8 @@ import {readFile} from 'node:fs/promises';
 import * as engine from '../src/engine.js';
 import * as art from '../src/card-art.js';
 import * as hints from '../src/hints.js';
+import {planKlondikeHint} from '../src/klondike-hints.js';
+import {rememberStock,restoreStockMemory} from '../src/stock-memory.js';
 import * as settings from '../src/game-settings.js';
 import {wasteLayout} from '../src/waste-layout.js';
 import {boardLayout} from '../src/board-layout.js';
@@ -28,7 +30,7 @@ function app(game,stored=new Map()) {
   }
   document.getElementById=id=>{if(!elements.has(id))elements.set(id,el(id));return elements.get(id);};
   document.createElement=()=>el();
-  const context={...engine,...art,...hints,...settings,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,document,
+  const context={...engine,...art,...hints,...settings,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,planKlondikeHint,rememberStock,restoreStockMemory,document,
     window:{localStorage:{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v)},devicePixelRatio:1,innerHeight:1000,scrollY:0,addEventListener(){}},
     getComputedStyle:()=>({paddingLeft:'8px',paddingRight:'8px'}),ResizeObserver:class{observe(){}},confirm:()=>true,
     setTimeout:()=>1,clearTimeout(){},setInterval(){},Date,console,structuredClone};
@@ -82,7 +84,7 @@ test('Hint gives visible feedback when all remaining suggestions repeat, without
   // would revisit the starting position. The footer can be below a long table.
   h.api.choose('stock');h.get('hint').onclick();
   assert.equal(h.get('hint-feedback').hidden,false);
-  assert.match(h.get('hint-feedback-text').textContent,/No new hint found/);
+  assert.match(h.get('hint-feedback-text').textContent,/No useful continuation found/);
   assert.equal(h.get('end-dialog').open,false);
   assert.equal(h.get('message')['aria-live'],'off');
   h.get('hint-feedback-close').onclick();assert.equal(h.get('hint-feedback').hidden,true);
@@ -92,32 +94,34 @@ test('Hint gives visible feedback when all remaining suggestions repeat, without
 });
 
 test('a stock recycle hint marks the empty Redeal pile and explains its action',()=>{
-  const g=board();g.waste=[c(9,'♥')];
+  const g=board();g.waste=[c(6,'♥'),c(9,'♥')];
+  g.stockMemory=[{r:6,s:'♥'},{r:9,s:'♥'}];
   const h=app(g);h.get('hint').onclick();
   assert.equal(h.get('hint-feedback').hidden,false);
-  assert.equal(h.get('hint-feedback-text').textContent,'Recycle the waste into the stock.');
+  assert.match(h.get('hint-feedback-text').textContent,/Recycle the waste into the stock.*known waste card/);
   assert.match(h.get('board').innerHTML,/class="pile hinted hint-source" data-key="stock"/);
   assert.equal(h.get('end-dialog').open,false);
 });
 
-test('a saved game started mid-pass can redeal but does not hint a draw back into a visited position',()=>{
+test('a saved game started mid-pass remembers seen stock across redeal, reload and undo',()=>{
   const g=board();g.waste=[c(9,'♥')];g.stock=[{...c(10,'♥'),up:false}];
   const h=app(g);
-  for(const message of ['Draw from the stock.','Recycle the waste into the stock.']) {
-    h.get('hint').onclick();
-    assert.equal(h.get('hint-feedback-text').textContent,message);
-    h.api.choose('stock');
-  }
+  h.get('hint').onclick();
+  assert.match(h.get('hint-feedback-text').textContent,/Draw from the stock.*unseen/);
+  h.api.choose('stock');
+  h.get('hint').onclick();
+  assert.match(h.get('hint-feedback-text').textContent,/No useful continuation found/);
+  h.api.choose('stock'); // Recycling by hand is still legal.
   h.api.flush();
   const restored=app(null,h.stored);
   restored.get('hint').onclick();
-  assert.match(restored.get('hint-feedback-text').textContent,/No new hint found/);
+  assert.match(restored.get('hint-feedback-text').textContent,/No useful continuation found/);
   assert.equal(restored.get('end-dialog').open,false);
   assert.doesNotMatch(restored.get('board').innerHTML,/hint-source/);
   restored.get('undo').onclick();
   restored.get('hint').onclick();
-  assert.equal(restored.get('hint-feedback-text').textContent,'Recycle the waste into the stock.');
+  assert.match(restored.get('hint-feedback-text').textContent,/No useful continuation found/);
   restored.get('redo').onclick();
   restored.get('hint').onclick();
-  assert.match(restored.get('hint-feedback-text').textContent,/No new hint found/);
+  assert.match(restored.get('hint-feedback-text').textContent,/No useful continuation found/);
 });

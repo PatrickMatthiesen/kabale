@@ -2,6 +2,8 @@ import { deal, applyMove, autoMove, legalMoves, pyramidPlayable } from './engine
 import { loadArt, saveArt, resolveArt, cardFace, getStorage } from './card-art.js';
 import { wasteLayout } from './waste-layout.js';
 import { hintRole as getHintRole, hintVisitKey, selectHint } from './hints.js';
+import { planKlondikeHint } from './klondike-hints.js';
+import { rememberStock, restoreStockMemory } from './stock-memory.js';
 import { boardLayout } from './board-layout.js';
 import { attachCardDrag } from './card-drag.js';
 import { loadEmptyColumns, saveEmptyColumns } from './game-settings.js';
@@ -34,6 +36,7 @@ try {
   }
 } catch { notice = 'Your saved game could not be loaded. A fresh table is ready.'; }
 if (g.mode === 'klondike') emptyColumns = g.emptyColumns ?? 'kings';
+restoreStockMemory([...past,g,...future.slice().reverse()]);
 let hintPositions = new Set([...past,g].map(hintVisitKey));
 const board = $('board');
 let cardDrag;
@@ -159,6 +162,7 @@ function action(fn) {
   hintFeedback='';
   const before = structuredClone(g);
   if (!fn()) { notice = 'That move is not available. Choose another card or destination.'; render(); return false; }
+  rememberStock(g,before);
   if (g.difficulty !== 'hard') { past.push(before); if (past.length > 100) past.shift(); }
   if (g.difficulty !== 'hard') hintPositions.add(hintVisitKey(g));
   future = []; selected = null; hint = null; notice = '';
@@ -207,6 +211,7 @@ function undo(redo = false) {
 function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyRule = emptyColumns) {
   if (g.moves && !g.won && !confirm(restart ? 'Restart this deal? Your moves will be cleared.' : 'Start a new deal? Your current game will be replaced.')) return false;
   g = restart ? structuredClone(initial) : deal(mode,difficulty,{emptyColumns:emptyRule});
+  rememberStock(g);
   emptyColumns = g.mode === 'klondike' ? (g.emptyColumns ?? 'kings') : emptyRule;
   saveEmptyColumns(storage,emptyColumns);
   if (!restart) { art.resolved = resolveArt(art.choice); saveArt(storage, art); }
@@ -232,10 +237,23 @@ $('restart').onclick = () => fresh(g.mode,g.difficulty,true);
 $('undo').onclick = () => undo();
 $('redo').onclick = () => undo(true);
 $('hint').onclick = () => {
-  if (g.difficulty === 'hard') return;
+  if (g.difficulty === 'hard' || g.won) return;
   selected=null;
-  hint = selectHint(g,hintPositions);
-  notice = hint ? (hint.from === 'stock' ? (g.stock.length ? 'Draw from the stock.' : 'Recycle the waste into the stock.') : `${hint.label}: ${sourceLabel(hint.from)} to ${sourceLabel(hint.to || hint.from)}.`) : legalMoves(g).length ? 'No new hint found. Try another approach or undo a move. This does not mean the deal is lost.' : 'No legal moves remain from this position.';
+  const plan = g.mode === 'klondike' ? planKlondikeHint(g,g.stockMemory,{visited:hintPositions,maxTimeMs:35}) : null;
+  hint = plan ? plan.move : selectHint(g,hintPositions);
+  if (!hint) {
+    notice = legalMoves(g).length ? 'No useful continuation found. Try another approach or undo a move.' : 'No legal moves remain from this position.';
+  } else if (hint.from === 'stock') {
+    const action = g.stock.length ? 'Draw from the stock.' : 'Recycle the waste into the stock.';
+    if (plan?.reason === 'explore') notice = `${action} There are still unseen cards to check.`;
+    else if (plan?.goal === 'waste') notice = `${action} A known waste card is playable after ${plan.path.length - 1} stock ${plan.path.length === 2 ? 'action' : 'actions'}.`;
+    else notice = action;
+  } else {
+    notice = `${hint.label}: ${sourceLabel(hint.from)} to ${sourceLabel(hint.to || hint.from)}.`;
+    if (plan?.path.length > 1 && plan.goal === 'reveal') notice += ' This sets up a move that uncovers a card.';
+    if (plan?.path.length > 1 && plan.goal === 'foundation') notice += ' This opens a path to the foundation.';
+    if (plan?.path.length > 1 && plan.goal === 'waste') notice += ' This opens a play from the waste.';
+  }
   hintFeedback=notice;
   render();
 };
