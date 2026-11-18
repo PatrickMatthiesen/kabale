@@ -1,7 +1,7 @@
 import { deal, applyMove, autoMove, legalMoves, pyramidPlayable } from './engine.js';
 import { loadArt, saveArt, resolveArt, cardFace, getStorage } from './card-art.js';
 import { wasteLayout } from './waste-layout.js';
-import { hintRole as getHintRole, hintPosition, selectHint } from './hints.js';
+import { hintRole as getHintRole, hintVisitKey, selectHint } from './hints.js';
 import { boardLayout } from './board-layout.js';
 import { attachCardDrag } from './card-drag.js';
 import { loadEmptyColumns, saveEmptyColumns } from './game-settings.js';
@@ -34,7 +34,7 @@ try {
   }
 } catch { notice = 'Your saved game could not be loaded. A fresh table is ready.'; }
 if (g.mode === 'klondike') emptyColumns = g.emptyColumns ?? 'kings';
-let hintPositions = new Set([...past,g].map(hintPosition));
+let hintPositions = new Set([...past,g].map(hintVisitKey));
 const board = $('board');
 let cardDrag;
 let cardPixels = 160;
@@ -160,8 +160,7 @@ function action(fn) {
   const before = structuredClone(g);
   if (!fn()) { notice = 'That move is not available. Choose another card or destination.'; render(); return false; }
   if (g.difficulty !== 'hard') { past.push(before); if (past.length > 100) past.shift(); }
-  hintPositions.add(hintPosition(before));
-  hintPositions.add(hintPosition(g));
+  if (g.difficulty !== 'hard') hintPositions.add(hintVisitKey(g));
   future = []; selected = null; hint = null; notice = '';
   if (g.won) elapsed += Date.now() - resumedAt;
   updateClock(); save(); render(); return true;
@@ -202,7 +201,7 @@ function undo(redo = false) {
   if (!from.length) return;
   hintFeedback='';
   elapsed = clock(); to.push(structuredClone(g)); g = from.pop(); selected = null; hint = null; notice = redo ? 'Move restored.' : 'Move undone.';
-  hintPositions = new Set([...past,g].map(hintPosition));
+  hintPositions = new Set([...past,g].map(hintVisitKey));
   resumedAt = Date.now(); save(); render();
 }
 function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyRule = emptyColumns) {
@@ -212,7 +211,7 @@ function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyR
   saveEmptyColumns(storage,emptyColumns);
   if (!restart) { art.resolved = resolveArt(art.choice); saveArt(storage, art); }
   initial = structuredClone(g); past = []; future = []; selected = null; hint = null; elapsed = 0; resumedAt = Date.now(); notice = '';
-  hintPositions = new Set([hintPosition(g)]);
+  hintPositions = new Set([hintVisitKey(g)]);
   hintFeedback='';
   seenEndNotices.clear(); endgameUI?.reset();
   save(); render(); return true;

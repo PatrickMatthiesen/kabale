@@ -2,7 +2,7 @@ import { applyMove, legalMoves } from './engine.js';
 
 // Ignore move counters and interchangeable column/cell/foundation positions.
 // Hidden identities never participate in hint selection.
-export function hintPosition(game) {
+function positionKey(game, useStockPhase) {
   const card = c => !c ? null : c.up ? [c.r,c.s] : '?';
   const piles = a => a.map(p => p.map(card)).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   return JSON.stringify({
@@ -10,33 +10,52 @@ export function hintPosition(game) {
     cols:game.mode === 'pyramid' ? game.cols.map(p=>p.map(card)) : piles(game.cols),
     cells:(game.cells ?? []).map(card).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))),
     found:piles(game.found ?? []), stock:game.stock.length,
-    waste:(game.waste ?? []).map(card), pairWaste:(game.pairWaste ?? []).map(card),
+    waste:useStockPhase ? game.waste.length : (game.waste ?? []).map(card),
+    drawCount:useStockPhase ? (game.drawCount || 1) : undefined,
+    pairWaste:(game.pairWaste ?? []).map(card),
     removed:game.removed?.length, redealsLeft:game.redealsLeft
   });
+}
+
+export function hintPosition(game) {
+  return positionKey(game,false);
+}
+
+// Within one forward history, Klondike draws and redeals preserve the combined
+// order of stock and waste. Playing a waste card shrinks their combined size.
+// Both counts therefore identify the stock phase without knowing any card faces.
+export function hintVisitKey(game) {
+  return positionKey(game,game.mode === 'klondike');
 }
 
 /** Choose a useful, unvisited move without solving or inspecting hidden cards. */
 export function selectHint(game, visited = new Set()) {
   if (game.won || game.difficulty === 'hard') return null;
-  const seen = new Set(visited);
-  seen.add(hintPosition(game));
-  const visible = structuredClone(game);
-  for (const c of [...visible.cols.flat(),...visible.stock]) {
-    if (c && !c.up) { c.r=0; c.s='?'; }
-  }
+  const current = hintVisitKey(game);
+  const seen = next => {
+    const key = hintVisitKey(next);
+    return key === current || visited.has(key);
+  };
+  const unknownCard = () => ({up:false,r:0,s:'?'});
+  const visible = {
+    ...game,
+    cols:game.cols.map(pile=>pile.map(c=>c && !c.up ? unknownCard() : c)),
+    stock:Array.from({length:game.stock.length},unknownCard)
+  };
   let best=null, bestScore=-Infinity;
-  for (const move of legalMoves(game)) {
+  for (const move of legalMoves(visible)) {
     let score=0;
     if (move.from === 'stock') {
-      // A draw's value is unknown. Only a recycle has a predictable visible state.
+      // Spider uses up stock. Pyramid uses up stock or a finite redeal.
+      // Only Klondike can cycle indefinitely through stock actions.
       score=10;
-      if (!game.stock.length) {
+      if (game.mode === 'klondike') {
         const next=structuredClone(visible);
-        if (!applyMove(next,move.from,move.to) || seen.has(hintPosition(next))) continue;
+        if (!applyMove(next,move.from,move.to) || seen(next)) continue;
       }
     } else {
       const next=structuredClone(visible);
-      if (!applyMove(next,move.from,move.to) || seen.has(hintPosition(next))) continue;
+      if (!applyMove(next,move.from,move.to) || seen(next)) continue;
       const [kind,column,index]=move.from.split(':');
       const source=kind === 'col' ? game.cols[+column] : null;
       const start=source ? (index === undefined ? source.length-1 : +index) : 0;

@@ -99,3 +99,25 @@ test('a stock recycle hint marks the empty Redeal pile and explains its action',
   assert.match(h.get('board').innerHTML,/class="pile hinted hint-source" data-key="stock"/);
   assert.equal(h.get('end-dialog').open,false);
 });
+
+test('a saved game started mid-pass can redeal but does not hint a draw back into a visited position',()=>{
+  const g=board();g.waste=[c(9,'♥')];g.stock=[{...c(10,'♥'),up:false}];
+  const h=app(g);
+  for(const message of ['Draw from the stock.','Recycle the waste into the stock.']) {
+    h.get('hint').onclick();
+    assert.equal(h.get('hint-feedback-text').textContent,message);
+    h.api.choose('stock');
+  }
+  h.api.flush();
+  const restored=app(null,h.stored);
+  restored.get('hint').onclick();
+  assert.match(restored.get('hint-feedback-text').textContent,/No new hint found/);
+  assert.equal(restored.get('end-dialog').open,false);
+  assert.doesNotMatch(restored.get('board').innerHTML,/hint-source/);
+  restored.get('undo').onclick();
+  restored.get('hint').onclick();
+  assert.equal(restored.get('hint-feedback-text').textContent,'Recycle the waste into the stock.');
+  restored.get('redo').onclick();
+  restored.get('hint').onclick();
+  assert.match(restored.get('hint-feedback-text').textContent,/No new hint found/);
+});
