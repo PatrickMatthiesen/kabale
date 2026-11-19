@@ -188,12 +188,13 @@ export function translate(language, text, values) {
   return values ? translated.replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match) : translated;
 }
 
-export function loadLanguage(storage, browserLanguages = []) {
+export function loadLanguage(storage, browserLanguage = 'en') {
   try {
     const saved = storage?.getItem(languageKey);
     if (languages.includes(saved)) return saved;
   } catch { /* Browser preferences still work if storage is blocked. */ }
-  return browserLanguages.map(locale => locale.toLowerCase().split('-')[0]).find(locale => languages.includes(locale)) ?? 'en';
+  const locale = browserLanguage.toLowerCase().split('-')[0];
+  return languages.includes(locale) ? locale : 'en';
 }
 
 export function saveLanguage(storage, language) {

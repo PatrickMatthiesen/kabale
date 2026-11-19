@@ -19,7 +19,7 @@ const art = loadArt(storage);
 saveArt(storage,art);
 let emptyColumns = loadEmptyColumns(storage);
 let indexSize = loadCardIndexSize(storage);
-let language = loadLanguage(storage,window.navigator?.languages ?? [window.navigator?.language ?? 'en']);
+let language = loadLanguage(storage,window.navigator?.language);
 const tr = (text,values) => translate(language,text,values);
 const setDocumentLanguage = document.documentElement ? bindDocumentLanguage(document) : null;
 
@@ -72,7 +72,7 @@ function fitBoard() {
   const below = feedbackHeight + pixels(getComputedStyle(document.body).paddingBottom)
     + pixels(getComputedStyle($('table-main')).paddingBottom)
     + pixels(getComputedStyle($('game-room')).borderBottomWidth);
-  const minimumHeight = document.documentElement?.hasAttribute('data-focus-mode') ? 0 : 180;
+  const minimumHeight = !feedback.hidden || document.documentElement?.hasAttribute('data-focus-mode') ? 0 : 180;
   const boardHeight = Math.max(minimumHeight,Math.floor(window.innerHeight - boardTop - below));
   const availableHeight = boardHeight - pixels(style.paddingTop) - pixels(style.paddingBottom)
     - pixels(style.borderTopWidth) - pixels(style.borderBottomWidth);

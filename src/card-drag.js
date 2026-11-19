@@ -101,7 +101,9 @@ export function attachCardDrag(board, { getMoves, onStart, onDrop, onCancel }) {
     // board releases that card and bubbles this event; the drag is still ours.
     if (event.target === board) finish(event,true);
   });
-  window.addEventListener('blur',cleanup);
+  window.addEventListener('blur',()=>{
+    if (gesture) finish({pointerId:gesture.id},true);
+  });
   window.addEventListener('resize',cleanup);
   return { cancel:cleanup };
 }
