@@ -96,6 +96,8 @@ const danish = {
   'Move {card} onto {target} on the foundation.': 'Læg {card} oven på {target} i esbunken.',
   'Move {card} to an empty foundation pile.': 'Læg {card} i en tom esbunke.',
   'Move {card} onto {target}.': 'Læg {card} oven på {target}.',
+  '{card} from column {number}': '{card} fra kolonne {number}',
+  '{card} in column {number}': '{card} i kolonne {number}',
   'Move {card} to empty column {number}.': 'Flyt {card} til den tomme kolonne {number}.',
   'Your saved game could not be loaded. A fresh table is ready.': 'Det gemte spil kunne ikke åbnes. Du har fået et nyt spil.',
   'Browser storage is unavailable. Keep this tab open to retain your game.': 'Spillet kunne ikke gemmes. Hold fanen åben for at spille videre senere.',

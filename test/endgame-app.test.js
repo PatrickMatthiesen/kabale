@@ -163,6 +163,7 @@ test('FreeCell hints name both face-up cards and mark the right handles',()=>{
   assert.equal(single.get('hint-feedback-text').textContent,'Move 7♣\uFE0E of clubs onto 8♥\uFE0E of hearts.');
   assert.match(single.get('board').innerHTML,/class="[^"]*hint-source"[^>]*data-key="col:0:1"/);
   assert.match(single.get('board').innerHTML,/class="[^"]*hint-destination"[^>]*data-key="col:1:0"/);
+  assert.match(single.get('board').innerHTML,/data-key="cell:1" aria-label="Free cell 2"/);
   single.get('hint-feedback-close').onclick();
   assert.doesNotMatch(single.get('board').innerHTML,/hint-source|hint-destination/);
 
@@ -171,6 +172,18 @@ test('FreeCell hints name both face-up cards and mark the right handles',()=>{
   stack.get('hint').onclick();
   assert.equal(stack.get('hint-feedback-text').textContent,'Move the stack starting with 7♣\uFE0E of clubs onto 8♥\uFE0E of hearts.');
   assert.match(stack.get('board').innerHTML,/class="[^"]*hint-source"[^>]*data-key="col:0:1"/);
+});
+
+test('Spider hints identify the columns of matching cards in both languages',()=>{
+  const g=engine.deal('spider','easy');
+  g.cols=[[c(7)],[c(8)],[{...c(7),id:'second-seven'}],[{...c(8),id:'second-eight'}],[],[],[],[],[],[]];
+  g.stock=[];
+  const h=app(g);
+  h.get('hint').onclick();
+  assert.equal(h.get('hint-feedback-text').textContent,'Move 7♠\uFE0E of spades from column 1 onto 8♠\uFE0E of spades in column 2.');
+  h.get('language').onchange({target:{value:'da'}});
+  h.get('hint').onclick();
+  assert.equal(h.get('hint-feedback-text').textContent,'Læg spar 7♠\uFE0E fra kolonne 1 oven på spar 8♠\uFE0E i kolonne 2.');
 });
 
 test('rank and suit size is saved independently of the deal and deck',()=>{

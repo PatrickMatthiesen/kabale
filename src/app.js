@@ -66,7 +66,10 @@ function fitBoard() {
   const pixels = value => parseFloat(value) || 0;
   const width = board.clientWidth - pixels(style.paddingLeft) - pixels(style.paddingRight);
   const boardTop = board.getBoundingClientRect().top + window.scrollY;
-  const below = pixels(getComputedStyle(document.body).paddingBottom)
+  const feedback = $('hint-feedback');
+  const feedbackHeight = feedback.hidden ? 0
+    : (feedback.getBoundingClientRect().height || 0) + pixels(getComputedStyle(feedback).marginTop);
+  const below = feedbackHeight + pixels(getComputedStyle(document.body).paddingBottom)
     + pixels(getComputedStyle($('table-main')).paddingBottom)
     + pixels(getComputedStyle($('game-room')).borderBottomWidth);
   const minimumHeight = document.documentElement?.hasAttribute('data-focus-mode') ? 0 : 180;
@@ -119,6 +122,7 @@ function saveNow() {
     hintFeedback = '';
     $('message').textContent = notice;
     renderFeedback();
+    fitBoard();
   }
 }
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 120); }
@@ -150,7 +154,10 @@ function describeCardHint(game, move) {
   }
   const [kind, column, index] = move.from.split(':');
   const isStack = kind === 'col' && index !== undefined && +index < game.cols[column].length - 1;
-  const card = isStack ? tr('the stack starting with {card}',{card:name(source)}) : name(source);
+  let card = isStack ? tr('the stack starting with {card}',{card:name(source)}) : name(source);
+  if (game.mode === 'spider' && kind === 'col') {
+    card = tr('{card} from column {number}',{card,number:+column + 1});
+  }
   const [destination, position] = move.to.split(':');
   if (destination === 'cell') return tr('Move {card} to free cell {number}.',{card,number:+position + 1});
   if (destination === 'found') {
@@ -158,7 +165,10 @@ function describeCardHint(game, move) {
       : tr('Move {card} to an empty foundation pile.',{card});
   }
   if (destination === 'col') {
-    return target ? tr('Move {card} onto {target}.',{card,target:name(target)})
+    return target ? tr('Move {card} onto {target}.',{
+      card,
+      target:game.mode === 'spider' ? tr('{card} in column {number}',{card:name(target),number:+position + 1}) : name(target)
+    })
       : tr('Move {card} to empty column {number}.',{card,number:+position + 1});
   }
   return tr('Look for the marked cards.');
@@ -189,7 +199,8 @@ function waste(cards, key) {
 }
 function pile(contents, key, label) {
   const role = !contents ? (key==='stock' && hint?.from===key ? 'hint-source' : hint?.to===key ? 'hint-destination' : '') : '';
-  return `<div class="pile ${role ? `hinted ${role}` : ''}" data-key="${key}">${contents || `<button class="placeholder empty-target" data-key="${key}" aria-label="${label || sourceLabel(key)}">${label || tr('Empty')}</button>`}</div>`;
+  const accessibleLabel = key.startsWith('cell:') ? sourceLabel(key) : label || sourceLabel(key);
+  return `<div class="pile ${role ? `hinted ${role}` : ''}" data-key="${key}">${contents || `<button class="placeholder empty-target" data-key="${key}" aria-label="${accessibleLabel}">${label || tr('Empty')}</button>`}</div>`;
 }
 function tableau(col, i) {
   let faceSteps = 0, backSteps = 0, lastTop = '0px';
@@ -262,6 +273,27 @@ function renderFeedback() {
   $('hint-feedback').hidden = !feedback;
   $('hint-feedback').dataset.hint = String(Boolean(hintFeedback));
   $('hint-feedback-text').textContent = feedback;
+}
+function revealHintSource() {
+  if (!(board.scrollHeight > board.clientHeight)) return;
+  const source = board.querySelector('.hint-source');
+  if (!source) return;
+  const target = board.querySelector('.hint-destination');
+  const sourceBox = source.getBoundingClientRect();
+  const nextCard = source.nextElementSibling;
+  const sourceBottom = nextCard?.matches('.card')
+    ? Math.min(sourceBox.bottom,nextCard.getBoundingClientRect().top) : sourceBox.bottom;
+  const targetBox = target?.getBoundingClientRect();
+  let top = sourceBox.top;
+  let bottom = sourceBottom;
+  if (targetBox && Math.max(bottom,targetBox.bottom) - Math.min(top,targetBox.top) <= board.clientHeight) {
+    top = Math.min(top,targetBox.top);
+    bottom = Math.max(bottom,targetBox.bottom);
+  }
+  const viewportTop = board.getBoundingClientRect().top + board.clientTop;
+  const viewportBottom = viewportTop + board.clientHeight;
+  if (top < viewportTop) board.scrollTop += top - viewportTop;
+  else if (bottom > viewportBottom) board.scrollTop += Math.min(top - viewportTop,bottom - viewportBottom);
 }
 function updateEndgame(newWin = false) {
   endgameUI?.update(g,{canUndo:past.length>0,time:$('time').textContent,deferResult:celebrating,newWin,language});
@@ -448,6 +480,7 @@ $('hint').onclick = () => {
   }
   hintFeedback=notice;
   render();
+  revealHintSource();
 };
 $('hint-feedback-close').onclick=()=>{hint=null;hintFeedback='';notice='';render();};
 $('rules').onclick = () => $('rules-dialog').showModal();
@@ -466,7 +499,11 @@ cardDrag = attachCardDrag(board, {
     if (to) action(()=>applyMove(g,from,to));
     else { notice=tr('Card returned to its original position.'); render(); }
   },
-  onCancel: () => { notice=tr('Move cancelled.'); $('message').textContent=notice; }
+  onCancel: () => {
+    notice=tr('Move cancelled.');
+    $('message').textContent=notice;
+    fitBoard();
+  }
 });
 document.addEventListener('keydown', e => {
   if (finishPlayback) {
