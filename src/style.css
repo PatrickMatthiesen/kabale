@@ -8,13 +8,13 @@
 .table-settings{display:flex;align-items:start;gap:12px;flex-wrap:wrap}.table-settings select{min-width:130px}#art-note{font-size:10px;max-width:160px;min-height:14px;color:#bacab9}.card{isolation:isolate}.card .court-art{display:block;inset:24px 5px 9px;border:0;border-radius:0;background-repeat:no-repeat;background-size:300% 100%;pointer-events:none}.card .court-art.rank-11{background-position:0 0}.card .court-art.rank-12{background-position:50% 0}.card .court-art.rank-13{background-position:100% 0}#board[data-art="engraved"] .court-art{background-image:url('../assets/cards/engraved.png')}#board[data-art="woodcut"] .court-art{background-image:url('../assets/cards/woodcut.png')}.card .corner{z-index:1}.card:has(.court-art) .corner{background:var(--card-paper);padding:1px 2px}@media(max-width:720px){.game-heading{align-items:start;flex-wrap:wrap}.table-settings{gap:10px;width:100%}.table-settings .difficulty-label{flex:1}.table-settings select{width:100%;min-width:0}.card .court-art{inset:20px 3px 5px}}
 
 
-#board{--card-paper:#f8f0dc}#board[data-art="woodcut"]{--card-paper:#fdf0d3}.card:not(.back){color-scheme:only light;background:var(--card-paper);border-color:#cdbd99}.card:not(.back):hover{filter:none}.card.hinted,.pile.hinted,.col.hinted{outline:2px dashed #85ddd2;outline-offset:-3px;animation:none}.card.hinted::after,.pile.hinted:has(.empty-target)::after{content:'Hint';position:absolute;top:3px;right:3px;padding:2px 4px;border-radius:3px;background:#164b49;color:#d4fff5;font:600 9px/1.2 'Segoe UI',sans-serif;pointer-events:none}.card.hint-source::after{content:'Move'}.card.hint-destination::after,.pile.hint-destination:has(.empty-target)::after{content:'Here'}.card.selected{outline:3px solid #f1d37d;outline-offset:2px}
+#board{--card-paper:#f8f0dc}#board[data-art="woodcut"]{--card-paper:#fdf0d3}.card:not(.back){color-scheme:only light;background:var(--card-paper);border-color:#cdbd99}.card:not(.back):hover{filter:none}.card.selected{outline:3px solid #f1d37d;outline-offset:2px}
 /* Full illustrations supply their paper and ornament; indices are separate. */
-.card.illustrated{border:0;background:transparent;color-scheme:only light}.full-face{position:absolute;inset:0;border-radius:inherit;background-repeat:no-repeat;pointer-events:none}.card.illustrated:hover{filter:none}.waste-pile{isolation:isolate;overflow:visible;border:0;background:none}.waste-layer{position:absolute;inset:0;transform-origin:50% 60%}.waste-ghost{pointer-events:none}.waste-ghost .card{pointer-events:none}.card.hinted::after,.pile.hinted:has(.empty-target)::after{top:-10px;right:-4px}
+.card.illustrated{border:0;background:transparent;color-scheme:only light}.full-face{position:absolute;inset:0;border-radius:inherit;background-repeat:no-repeat;pointer-events:none}.card.illustrated:hover{filter:none}.waste-pile{isolation:isolate;overflow:visible;border:0;background:none}.waste-layer{position:absolute;inset:0;transform-origin:50% 60%}.waste-ghost{pointer-events:none}.waste-ghost .card{pointer-events:none}
 #board{--card-h:calc(var(--card-w) * 14 / 9);--face-step:clamp(28px,3.4vw,38px);--back-step:20px}
 
 
-.col.hint-destination:has(.empty-target)::after{content:'Here';position:absolute;top:-10px;right:-4px;padding:2px 4px;border-radius:3px;background:#164b49;color:#d4fff5;font:600 9px/1.2 'Segoe UI',sans-serif;pointer-events:none}.card.back.hint-source::after{content:'Draw'}
+
 .rules-list{padding-left:20px;color:#c4d0c1;font-size:14px;line-height:1.65}.rules-list li+li{margin-top:12px}
 /* Use the same circular corners at every size of a 9:14 card. */
 .card,.pile,.empty-target,.col:has(>.empty-target){
@@ -31,64 +31,81 @@
 .card-face[data-art="woodcut"]{--index-paper:#fdf0d3}
 .card.red .card-face{--index-color:#a41920}
 .card .full-face{position:absolute;inset:0;border-radius:inherit;background-repeat:no-repeat;pointer-events:none}
-.card-index{position:absolute;z-index:1;left:clamp(1.5px,3cqw,6px);width:max-content;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:0;white-space:nowrap;pointer-events:none;color:var(--index-color);font:700 min(46cqw,clamp(12px,40cqw,calc(20cqw + 14px)))/.85 Georgia,'Times New Roman',serif;-webkit-text-stroke:1.4px var(--index-paper);paint-order:stroke fill;text-shadow:0 1px 1px var(--index-paper)}
-.card-index b{font:inherit;letter-spacing:-.06em}
-.card-index span{font-size:.65em}
-.card-index-top{top:clamp(2px,3cqw,6px)}
-.card-index-bottom{bottom:clamp(2px,3cqw,6px);left:auto;right:clamp(1.5px,3cqw,6px);transform:rotate(180deg)}
+.card-index {
+  position: absolute;
+  z-index: 1;
+  left: clamp(2px, 3cqw, 5px);
+  display: flex;
+  align-items: center;
+  gap: clamp(1px, 1.5cqw, 3px);
+  color: var(--index-color);
+  font: 700 min(44cqw, calc(var(--card-index-scale, 1) * min(37cqw, calc(16cqw + 9px))))/1 Georgia, 'Times New Roman', serif;
+  white-space: nowrap;
+}
+.card-face:not([data-art="contrast"]) .card-index {
+  -webkit-text-stroke: clamp(.6px, 1cqw, 1.4px) var(--index-paper);
+  paint-order: stroke fill;
+}
+.card-index b { font: inherit; letter-spacing: -.045em; }
+.card-index span { font-size: .78em; }
+.card-index-top { top: clamp(2px, 3cqw, 5px); }
+.card-index-bottom {
+  bottom: clamp(2px, 3cqw, 5px);
+  left: auto;
+  right: clamp(2px, 3cqw, 5px);
+  transform: rotate(180deg);
+}
 /* Keep centered Pyramid rows inside positive, horizontally scrollable space. */
 .pyramidrow{gap:2px;min-width:0}[data-mode="pyramid"] .stockrow{min-width:0}
 /* Card widths are fitted to the board content width for each game's column count. */
 #board{min-width:0}.row,.tableau,.pyramidrow{gap:var(--layout-gap,2px)}.tableau{width:100%;min-width:0}.pyramidrow{width:100%;min-width:0}#board[data-mode="pyramid"] .stockrow{width:100%;min-width:0}#board[data-mode="freecell"] .reserve-spacer{display:none}.table-settings .difficulty-label{min-width:0}
 @media(max-width:720px){
-  #board{padding:14px 8px 22px}
-  #modes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;overflow:visible}
-  #modes button{min-width:0;padding:9px 3px;font-size:12px}
-  .placeholder,.empty-target{font-size:clamp(8px,2.3vw,11px)}
   .back-medallion{font-size:clamp(18px,5vw,30px)}
+  .stat small{font-size:7px}
+  .stat b{font-size:13px}
 }
-@media(max-width:720px){.table-settings select{font-size:16px}}
-/* Keep the table central; secondary preferences live in the settings dialog. */
-.room{max-width:1720px}.topbar{gap:16px}main{padding-top:16px}#board,#modes,.difficulty-note,footer{max-width:1480px}#settings-dialog .table-settings{align-items:start}#settings-dialog .difficulty-label{flex:1;min-width:0}#settings-dialog select{width:100%;min-width:0;font-size:16px}
-@media(max-width:720px){
-  .topbar{min-height:0;padding:6px 10px;gap:4px;align-items:center}
-  .brand{gap:0}.brand-mark,.brand-name small{display:none}.brand-name{font-size:17px}
-  .stats{gap:12px;order:0;width:auto;justify-content:initial}.stat{min-width:35px}.stat small{font-size:7px}.stat b{font-size:13px}
-  .toolbar{flex:0 0 100%;justify-content:space-between;gap:2px}
-  .tool-button{width:34px;height:38px;font-size:8px}.tool-button svg{width:16px;height:16px}
-  .toolbar .primary{padding:0 8px;height:36px;font-size:11px}.toolbar .primary svg{display:none}
-  main{padding:6px 6px 12px}#modes{padding:0;margin:0 0 7px}#modes button{padding:7px 3px;font-size:12px}
-  #difficulty-note{display:none}#board{padding:12px 8px 20px;min-height:calc(100svh - 170px)}
-  footer{margin-top:7px;min-height:24px;font-size:11px}
-}
+#settings-dialog select{width:100%;min-width:0;font-size:16px}
 .card:not(:disabled){touch-action:none}.dragging-cards,.dragging-cards *{cursor:grabbing!important;user-select:none}.drag-source{opacity:.22;pointer-events:none}.drag-preview{position:fixed;z-index:10000;pointer-events:none;isolation:isolate}.drag-preview .card{opacity:1;pointer-events:none;transform:none;transition:none}.drop-target{outline:2px dashed #85ddd2;outline-offset:2px}.drop-hover{outline:3px solid #b8f6db;background-color:#92dccb22}.variant-setting{margin-top:18px}.variant-setting[hidden]{display:none}
-/* Use compact game controls in landscape phones and narrow tablet windows too. */
-@media(min-width:721px) and (max-width:1100px){
- body{padding:0}.room{min-height:100svh;border:0;border-radius:0}.topbar{flex-wrap:wrap;min-height:0;padding:6px max(10px,env(safe-area-inset-right)) 6px max(10px,env(safe-area-inset-left));gap:6px}
- .brand-mark,.brand-name small{display:none}.brand-name{font-size:17px}.brand{flex:0 0 auto;margin-right:auto}.stats{gap:10px}.stat small{font-size:7px}.stat b{font-size:13px}.toolbar{flex:1 1 auto;justify-content:flex-end;gap:3px}.tool-button{width:38px;height:36px;padding:0;flex-direction:column;gap:0;font-size:9px}.tool-button svg{width:15px;height:15px}.toolbar .primary{height:36px;font-size:12px;padding:0 10px}.toolbar .primary svg{display:none}
- main{padding:6px max(8px,env(safe-area-inset-right)) 12px max(8px,env(safe-area-inset-left))}#modes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:0;margin-bottom:6px;overflow:visible}#modes button{min-width:0;padding:5px 3px;font-size:12px}#difficulty-note{display:none}#board{padding:12px 8px 20px}footer{margin-top:6px}
-}
 /* Keep recovery choices near the table without treating missing hints as a loss. */
-.end-actions{max-width:1480px;margin:8px auto 0;display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;color:#c4d0c1;font-size:13px}.end-actions>span{margin-right:auto}.end-actions .tool-button{width:auto;font-size:13px;padding:0 12px}.end-actions[hidden],.end-actions [hidden],#end-dialog [hidden]{display:none}
-#end-dialog{max-height:calc(100svh - 24px);overflow:auto}#end-dialog::backdrop{background:#06140f66;backdrop-filter:blur(1px)}#end-dialog .dialog-card{padding:28px}#end-dialog h2{padding-right:16px}#end-dialog .end-stats{color:var(--gold);font:18px Georgia,serif}.end-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:22px}.end-buttons .tool-button{width:auto;min-height:44px;height:auto;padding:10px;border-color:#d9c48a40;font-size:14px;white-space:normal}.end-buttons .primary{color:#2f382a}.win-mark{display:none;width:68px;height:68px;margin:0 auto 18px;border:1px solid #d9bc7c80;border-radius:50%;background:#d9bc7c12;color:var(--gold)}.win-mark svg{width:44px;height:44px;fill:#173d31;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}#end-dialog[data-outcome="won"] .win-mark{display:grid;place-items:center;animation:win-arrive .35s ease-out}#end-dialog[data-outcome="won"] h2,#end-dialog[data-outcome="won"] p{text-align:center}@keyframes win-arrive{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}@media(max-width:720px){#end-dialog{width:calc(100% - 16px);margin:auto auto max(8px,env(safe-area-inset-bottom));border-radius:18px}#end-dialog .dialog-card{padding:24px 20px}.end-actions{font-size:12px}.end-actions .primary,.end-actions .tool-button{min-height:40px;height:auto;padding:8px 12px}}
-/* Compact, dismissible feedback stays visible above long tables. */
-.hint-feedback{position:fixed;z-index:1000;inset:auto 12px max(12px,env(safe-area-inset-bottom));width:max-content;max-width:min(640px,calc(100% - 24px));margin-inline:auto;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border:1px solid #d8c58b55;border-radius:14px;background:#12372f;color:#f1ead8;box-shadow:0 4px 18px #061b154d;font:500 clamp(14px,calc(12px + .3vw),18px)/1.45 'Segoe UI',sans-serif}.hint-feedback[hidden]{display:none}.hint-feedback>.hint-symbol{flex:0 0 20px;width:20px;height:20px;fill:none;stroke:#85ddd2;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.hint-feedback>span{min-width:0;overflow-wrap:break-word}.hint-feedback>button{flex:0 0 36px;width:36px;height:36px;padding:8px;border:0;border-radius:50%;background:transparent;color:#c5d4c6;cursor:pointer}.hint-feedback>button:hover{background:#ffffff0b;color:#fff4d8}.hint-feedback>button svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
-/* All source and destination badges follow the actual fitted card width. */
-#board{--hint-font:clamp(9px,calc(var(--card-w) * .1),16px);--hint-pad-x:clamp(3px,calc(var(--card-w) * .035),6px);--hint-pad-y:clamp(2px,calc(var(--card-w) * .025),4px)}
-.card.hinted,.pile.hinted,.col.hinted{outline-width:clamp(2px,calc(var(--card-w) * .018),3px)}
-.card.hinted::after,.pile.hinted:has(.empty-target)::after,.col.hint-destination:has(.empty-target)::after{top:0;right:0;transform:translateY(-50%);padding:var(--hint-pad-y) var(--hint-pad-x);border:1px solid #85ddd2;border-radius:6px;background:#174b42;color:#eafff9;box-shadow:0 2px 4px #061b1540;font:600 var(--hint-font)/1.2 'Segoe UI',sans-serif;white-space:nowrap}
-.pile.hint-source:has(.empty-target)::after{content:'Redeal'}.pile.hint-source .empty-target{font-size:var(--hint-font)}
+#end-dialog [hidden]{display:none}
+#end-dialog{max-height:calc(100svh - 24px);overflow:auto}#end-dialog::backdrop{background:#06140f66;backdrop-filter:blur(1px)}#end-dialog .dialog-card{padding:28px}#end-dialog h2{padding-right:16px}#end-dialog .end-stats{color:var(--gold);font:18px Georgia,serif}.end-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:22px}.end-buttons .tool-button{width:auto;min-height:44px;height:auto;padding:10px;border-color:#d9c48a40;font-size:14px;white-space:normal}.end-buttons .primary{color:#2f382a}.win-mark{display:none;width:68px;height:68px;margin:0 auto 18px;border:1px solid #d9bc7c80;border-radius:50%;background:#d9bc7c12;color:var(--gold)}.win-mark svg{width:44px;height:44px;fill:#173d31;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}#end-dialog[data-outcome="won"] .win-mark{display:grid;place-items:center;animation:win-arrive .35s ease-out}#end-dialog[data-outcome="won"] h2,#end-dialog[data-outcome="won"] p{text-align:center}@keyframes win-arrive{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}@media(max-width:720px){#end-dialog{width:calc(100% - 16px);margin:auto auto max(8px,env(safe-area-inset-bottom));border-radius:18px}#end-dialog .dialog-card{padding:24px 20px}}
+/* Keep feedback in its own row so every card remains clickable. */
+.hint-feedback{width:max-content;max-width:min(640px,100%);margin:6px auto 0;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border:1px solid #d8c58b55;border-radius:14px;background:#12372f;color:#f1ead8;box-shadow:0 4px 18px #061b154d;font:500 clamp(14px,calc(12px + .3vw),18px)/1.45 'Segoe UI',sans-serif}.hint-feedback[hidden]{display:none}.hint-feedback>.hint-symbol{flex:0 0 20px;width:20px;height:20px;fill:none;stroke:#85ddd2;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.hint-feedback>span{min-width:0;overflow-wrap:break-word}.hint-feedback>button{flex:0 0 36px;width:36px;height:36px;padding:8px;border:0;border-radius:50%;background:transparent;color:#c5d4c6;cursor:pointer}.hint-feedback>button:hover{background:#ffffff0b;color:#fff4d8}.hint-feedback>button svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+/* Keep hint marks above the art and within the exposed edge of stacked cards. */
+.hint-source { --hint-accent: #77e4c7; --hint-edge: solid; }
+.hint-destination { --hint-accent: #bfc7ff; --hint-edge: dashed; }
+.card.hinted::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 2px var(--hint-edge) var(--hint-accent);
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px #202d35;
+  pointer-events: none;
+}
+:is(.pile, .col).hinted {
+  outline: 2px var(--hint-edge) var(--hint-accent);
+  outline-offset: -2px;
+}
+@container playing-card (min-width: 86px) {
+  .card.hinted .card-face::after {
+    position: absolute;
+    z-index: 2;
+    top: 4px;
+    right: 4px;
+    padding: 2px 5px;
+    border: 1px solid var(--hint-accent);
+    border-radius: 4px;
+    background: #202d35;
+    color: var(--hint-accent);
+    font: 600 clamp(9px, 9cqw, 12px)/1.1 'Segoe UI', sans-serif;
+  }
+  .card.hint-source .card-face::after { content: var(--hint-move-label, 'Move'); }
+  .card.hint-destination .card-face::after { content: var(--hint-here-label, 'Here'); }
+}
 @media(pointer:coarse){.hint-feedback>button{flex-basis:44px;width:44px;height:44px;padding:12px}}
 
-.table-controls {
-  display: flex;
-  align-items: flex-start;
-  gap: 0 12px;
-  max-width: 1480px;
-  margin: 0 auto;
-}
-.table-controls #modes { flex: 1; min-width: 0; margin-inline: 0; }
-#finish-game { flex: none; }
 #finish-game[hidden], #skip-finish[hidden] { display: none; }
 #skip-finish {
   position: fixed;
@@ -96,12 +113,6 @@
   right: 12px;
   bottom: max(12px, env(safe-area-inset-bottom));
 }
-@media (max-width: 720px) {
-  .table-controls { flex-wrap: wrap; }
-  .table-controls #modes { flex-basis: 100%; }
-  #finish-game { margin: 0 0 8px auto; }
-}
-
 /* Decorative clones are separate from the playable board. */
 .card-motion-overlay {
   position: fixed;
@@ -117,39 +128,41 @@
   .card-motion-overlay { display: none; }
 }
 
-/* The high-contrast deck puts both identifiers in the exposed row. */
+/* Solid white faces with large suit symbols. */
 .card-face[data-art="contrast"] {
-  color: #121b29;
-  background: #fffefa;
-  box-shadow: inset 0 0 0 1px #20273855;
+  --index-paper: #fff;
+  --index-color: #192534;
+  background: var(--index-paper);
+  color: var(--index-color);
+  box-shadow: inset 0 0 0 1px #deddd6;
 }
-.card.red .card-face[data-art="contrast"] { color: #b20c26; }
-.card-face[data-art="contrast"] .card-index {
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: baseline;
-  width: auto;
-  inset-inline: clamp(1.5px,3cqw,6px);
-  color: inherit;
-  line-height: .9;
-  -webkit-text-stroke: 0;
-  text-shadow: none;
+.card.red .card-face[data-art="contrast"] { --index-color: #b20c26; }
+.card-face[data-art="contrast"]::before {
+  content: '';
+  position: absolute;
+  inset: 4%;
+  border: 1px solid #deddd6;
+  border-radius: inherit;
 }
-.card-face[data-art="contrast"] .card-index span { font-size: .8em; }
 .contrast-suit {
   position: absolute;
-  inset: 28% 0 0;
+  inset: 0;
   display: grid;
   place-items: center;
-  font: 700 min(74cqw, 112px)/1 Georgia, "Times New Roman", serif;
+  font: 700 min(74cqw, 112px)/1 Georgia, 'Times New Roman', serif;
 }
+.hint-feedback[data-hint="false"] > .hint-symbol { display: none; }
 
 /* Fit the cards beneath the controls. Very long stacks can scroll inside the felt. */
 #board {
-  --reserve-gap: 12px;
+  --reserve-gap: 6px;
   min-height: 0;
   height: var(--table-height, auto);
   scrollbar-gutter: stable;
+}
+#board :is(.reserve-row, .tableau) {
+  width: var(--tableau-width, 100%);
+  margin-inline: auto;
 }
 #board .reserve-row { margin-bottom: var(--reserve-gap); }
 #board .tableau { margin-bottom: 0; }
@@ -157,32 +170,220 @@
 #board[data-mode="pyramid"] .pyramidrow:nth-child(7) { margin-bottom: var(--reserve-gap); }
 #board[data-mode="pyramid"] .stockrow { margin-block: 0; }
 
-.freecell-rail { display: flex; gap: var(--layout-gap); }
+.reserve-group { display: flex; gap: var(--layout-gap); }
+#board .empty-target {
+  display: grid;
+  place-content: center;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 2px;
+  font-size: clamp(8px, calc(var(--card-w) * .19), 12px);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+#board .empty-target span { padding: 0; font: inherit; }
 #board[data-side-reserves="true"] {
   --rail-width: calc(var(--card-w) * .64);
   display: grid;
-  grid-template-columns: var(--rail-width) minmax(0,1fr) var(--rail-width);
-  grid-template-areas: "cells tableau foundations";
+  grid-template-columns: var(--rail-width) var(--tableau-width, 1fr) var(--rail-width);
+  grid-template-areas: "start tableau end";
   gap: var(--layout-gap);
   align-items: start;
   align-content: start;
+  justify-content: center;
 }
 #board[data-side-reserves="true"] .reserve-row { display: contents; }
-#board[data-side-reserves="true"] .freecell-rail {
+#board[data-side-reserves="true"] .reserve-spacer { display: none; }
+#board[data-side-reserves="true"] .reserve-group {
   --card-w: var(--rail-width);
   --card-h: calc(var(--card-w) * 14 / 9);
   flex-direction: column;
 }
-#board[data-side-reserves="true"] .freecell-rail > .pile { flex: none; }
-#board[data-side-reserves="true"] .freecell-cells { grid-area: cells; }
-#board[data-side-reserves="true"] .freecell-foundations { grid-area: foundations; }
+#board[data-side-reserves="true"] .reserve-group > .pile { flex: none; }
+#board[data-side-reserves="true"] .reserve-start { grid-area: start; }
+#board[data-side-reserves="true"] .reserve-end { grid-area: end; }
 #board[data-side-reserves="true"] .tableau { grid-area: tableau; }
-@media (max-width: 1100px) {
-  #board { --reserve-gap: 8px; }
+#fullscreen .exit-fullscreen { display: none; }
+#fullscreen[aria-pressed="true"] .enter-fullscreen { display: none; }
+#fullscreen[aria-pressed="true"] .exit-fullscreen { display: inline; }
+
+/* Share the same action row in windowed play and fullscreen. */
+body { padding: 0; }
+.room {
+  min-height: 100vh;
+  min-height: 100svh;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
 }
-@media (min-width: 1101px) and (max-height: 820px) {
-  body { padding-block: 8px; }
-  .room { min-height: calc(100svh - 16px); }
-  .topbar { min-height: 0; padding-block: 7px; }
-  main { padding-block: 8px 10px; }
+.topbar {
+  min-height: 0;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 4px max(8px, env(safe-area-inset-right)) 4px max(8px, env(safe-area-inset-left));
 }
+.brand { flex: none; margin: 0; }
+.brand-mark, .brand-name small { display: none; }
+.stats { flex: none; width: auto; order: 0; gap: 5px; margin-left: auto; }
+.stat { min-width: 35px; }
+#modes {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  min-width: 0;
+  border: 1px solid #e4cc9233;
+  border-radius: 8px;
+  background: #09291d45;
+}
+#modes button {
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-color: transparent;
+  border-radius: 5px;
+  background: transparent;
+  white-space: nowrap;
+}
+#modes button:hover {
+  border-color: #e4cc9233;
+  background: #e4cc9214;
+}
+#modes button.active {
+  border-color: #e4cc9259;
+  background: #dfbd6d34;
+  color: #fff0cd;
+}
+.toolbar { flex: none; gap: 3px; justify-content: flex-end; }
+.toolbar :is(.tool-button, .primary) {
+  width: auto;
+  height: 34px;
+  padding: 0 7px;
+  flex-direction: row;
+  gap: 4px;
+  border-radius: 7px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.toolbar .primary { box-shadow: none; }
+#finish-game {
+  background: #d9bc7c20;
+  border-color: #e4cc926b;
+  color: #fff0cd;
+}
+#finish-game:hover { background: #d9bc7c35; }
+#table-main { padding: 4px max(5px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(5px, env(safe-area-inset-left)); }
+#board { max-width: none; padding: 8px 8px 6px; }
+#settings-dialog {
+  width: min(520px, calc(100% - 24px));
+  max-height: calc(100svh - 24px);
+  overflow: auto;
+  border-color: #ddc58c69;
+}
+.settings-card { padding: clamp(18px, 5vw, 30px); }
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.settings-header h2 { margin: 0; }
+.settings-header .dialog-close {
+  position: static;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #ddc58c44;
+  border-radius: 8px;
+  font: 22px/1 'Segoe UI', sans-serif;
+}
+.settings-header .dialog-close:hover { background: #e5ca8a1a; }
+.settings-language {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #ddc58c33;
+  border-radius: 10px;
+  background: #0d2d24;
+  font-weight: 600;
+}
+.settings-section {
+  min-width: 0;
+  margin: 18px 0 0;
+  padding: 8px 0 0;
+  border: 0;
+  border-top: 1px solid #ddc58c33;
+}
+.settings-section legend {
+  padding: 0 8px 0 0;
+  color: #ead5a3;
+  font-weight: 650;
+}
+.settings-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.settings-field { display: grid; gap: 5px; align-content: start; font-size: 13px; color: #e7ddc6; }
+.settings-field[hidden] { display: none; }
+#settings-dialog select {
+  min-height: 42px;
+  padding-inline: 9px;
+  border: 1px solid #ddc58c54;
+  border-radius: 8px;
+  background: #102e26;
+  color: var(--ivory);
+}
+#settings-dialog #art-note { font-size: 12px; color: var(--muted); }
+#settings-dialog #settings-redeal-note { margin: 8px 0 0; font-size: 12px; }
+.settings-footer { display: flex; justify-content: flex-end; margin-top: 18px; }
+@media (max-width: 440px) {
+  .settings-fields { grid-template-columns: 1fr; }
+}
+@media (max-width: 1240px) {
+  .toolbar .tool-button { padding-inline: 6px; }
+  .toolbar .tool-button span { display: none; }
+}
+@media (min-width: 940px) {
+  .toolbar #fullscreen span { display: inline; }
+}
+@media (max-width: 1023px) {
+  .brand { display: none; }
+}
+@media (min-width: 721px) and (max-width: 939px) {
+  #modes button { padding-inline: 5px; font-size: 12px; }
+  .toolbar .primary svg { display: none; }
+}
+@media (min-width: 721px) and (max-width: 799px) {
+  .stats { display: none; }
+}
+@media (max-width: 720px) {
+  .topbar { flex-wrap: wrap; column-gap: 4px; }
+  #modes { flex: 1; }
+  #modes button { flex: 1; padding-inline: 3px; font-size: clamp(9px, 3vw, 12px); }
+  .toolbar { flex: 0 0 100%; justify-content: space-between; gap: 1px; }
+  .toolbar :is(.tool-button, .primary) { padding-inline: 3px; font-size: 11px; }
+  .toolbar .tool-button svg { width: 14px; height: 14px; }
+  .toolbar .primary svg { display: none; }
+}
+@media (max-width: 300px) {
+  .toolbar :is(.tool-button, .primary) { padding-inline: 1px; font-size: 10px; }
+}
+@media (max-width: 260px) {
+  .toolbar :is(.tool-button, .primary) { border-width: 0; font-size: 9px; }
+  .toolbar .tool-button svg { width: 12px; height: 12px; }
+  .stats { display: none; }
+}
+html[data-focus-mode] { overflow: hidden; }
+html[data-focus-mode] .room {
+  min-height: 100dvh;
+  background: var(--felt);
+  box-shadow: none;
+}
+html[data-focus-mode] :is(.brand, .stats, #modes, #rules, #settings-open),
+html[data-focus-mode] .room[data-difficulty="hard"] :is(#undo, #redo, #hint) {
+  display: none;
+}
+html[data-focus-mode] .topbar { justify-content: center; flex-wrap: nowrap; }
+html[data-focus-mode] .toolbar { flex: 0 1 auto; justify-content: center; }
+html[data-focus-mode] #fullscreen span { display: inline; }

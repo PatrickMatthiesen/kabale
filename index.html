@@ -1,23 +1,83 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#15382e"><title>Kabale | A little room for cards</title><link rel="stylesheet" href="src/style.css"></head>
 <body><div id="game-room" class="room">
-<header class="topbar"><a class="brand" href="#" aria-label="Kabale home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 44 44"><path d="M22 4 40 14v16L22 40 4 30V14z"/><path d="m24 10-11 13h8l-2 11 12-15h-8z"/></svg></span><span class="brand-name">Kabale<small>A little room for cards</small></span></a>
-<div class="stats" aria-label="Game statistics"><span class="stat"><small>TIME</small><b id="time">00:00</b></span><span class="stat"><small>MOVES</small><b id="moves">0</b></span></div>
+<header class="topbar"><a class="brand" href="#" aria-label="Kabale home" data-i18n-aria-label><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 44 44"><path d="M22 4 40 14v16L22 40 4 30V14z"/><path d="m24 10-11 13h8l-2 11 12-15h-8z"/></svg></span><span class="brand-name">Kabale<small data-i18n>A little room for cards</small></span></a>
+<nav id="modes" aria-label="Choose a solitaire game" data-i18n-aria-label></nav>
+<div class="stats" aria-label="Game statistics" data-i18n-aria-label><span class="stat"><small data-i18n>TIME</small><b id="time">00:00</b></span><span class="stat"><small data-i18n>MOVES</small><b id="moves">0</b></span></div>
 <div class="toolbar">
-<button id="undo" class="tool-button" type="button" title="Undo last move" aria-label="Undo last move"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M5 9h8a7 7 0 0 1 0 14h-1"/></svg><span>Undo</span></button>
-<button id="redo" class="tool-button" type="button" title="Redo move" aria-label="Redo move"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5m4 5h-8a7 7 0 0 0 0 14h1"/></svg><span>Redo</span></button>
-<button id="hint" class="tool-button" type="button" title="Show a hint" aria-label="Show a hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6m-5 4h4m-3-21a7 7 0 0 0-4 13c1 .7 1.5 1.5 1.5 2h5c0-.5.5-1.3 1.5-2A7 7 0 0 0 11 1Z"/></svg><span>Hint</span></button>
-<button id="rules" class="tool-button" type="button" title="How to play" aria-label="How to play"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.4 2.4 0 1 1 4 1.8c-1.2.9-1.7 1.3-1.7 2.7m0 3v.1"/></svg><span>Rules</span></button>
-<button id="restart" class="tool-button" type="button" title="Restart this deal" aria-label="Restart this deal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7v5h5M5 12a8 8 0 1 0 2-6"/></svg><span>Restart</span></button>
-<button id="settings-open" class="tool-button" type="button" aria-label="Game settings" title="Game settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg><span>Settings</span></button><button id="new" class="primary" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"/></svg><span>New deal</span></button></div></header>
-<main id="table-main"><h1 class="sr-only">Solitaire</h1>
-<div class="table-controls"><nav id="modes" aria-label="Choose a solitaire game"></nav><button id="finish-game" class="primary" type="button" hidden>Finish game</button></div><p id="difficulty-note" class="difficulty-note"></p><section id="board" aria-label="Solitaire card table"></section>
-<footer id="table-footer"><span id="message" role="status" aria-live="polite">Choose a card, then its destination.</span><span class="footer-note">Double-click to move · A for auto-move</span></footer>
-<section id="end-actions" class="end-actions" aria-label="Game options" hidden><span id="end-summary"></span><button id="end-review" class="tool-button" type="button">Review options</button></section>
+<button id="undo" class="tool-button" type="button" title="Undo last move" data-i18n-title aria-label="Undo last move" data-i18n-aria-label><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M5 9h8a7 7 0 0 1 0 14h-1"/></svg><span data-i18n>Undo</span></button>
+<button id="redo" class="tool-button" type="button" title="Redo move" data-i18n-title aria-label="Redo move" data-i18n-aria-label><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5m4 5h-8a7 7 0 0 0 0 14h1"/></svg><span data-i18n>Redo</span></button>
+<button id="hint" class="tool-button" type="button" title="Show a hint" data-i18n-title aria-label="Show a hint" data-i18n-aria-label><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6m-5 4h4m-3-21a7 7 0 0 0-4 13c1 .7 1.5 1.5 1.5 2h5c0-.5.5-1.3 1.5-2A7 7 0 0 0 11 1Z"/></svg><span data-i18n>Hint</span></button>
+<button id="rules" class="tool-button" type="button" title="How to play" data-i18n-title aria-label="How to play" data-i18n-aria-label><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.4 2.4 0 1 1 4 1.8c-1.2.9-1.7 1.3-1.7 2.7m0 3v.1"/></svg><span data-i18n>Rules</span></button>
+<button id="restart" class="tool-button" type="button" title="Restart this deal" data-i18n-title aria-label="Restart this deal" data-i18n-aria-label><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7v5h5M5 12a8 8 0 1 0 2-6"/></svg><span data-i18n>Restart</span></button>
+<button id="fullscreen" class="tool-button" type="button" aria-pressed="false" title="Full screen" data-i18n-title aria-label="Full screen" data-i18n-aria-label><svg viewBox="0 0 24 24" aria-hidden="true"><path class="enter-fullscreen" d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/><path class="exit-fullscreen" d="M4 9h5V4m6 0v5h5m0 6h-5v5m-6 0v-5H4"/></svg><span data-i18n>Full screen</span></button>
+<button id="settings-open" class="tool-button" type="button" aria-label="Game settings" data-i18n-aria-label title="Game settings" data-i18n-title><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg><span data-i18n>Settings</span></button><span id="end-actions" hidden><span id="end-summary" class="sr-only"></span><button id="end-review" class="tool-button" type="button" data-i18n>Review options</button></span><button id="finish-game" class="primary" type="button" hidden data-i18n>Finish game</button><button id="new" class="primary" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-7-7h14"/></svg><span data-i18n>New deal</span></button></div></header>
+<main id="table-main"><h1 class="sr-only" data-i18n>Solitaire</h1>
+<section id="board" aria-label="Solitaire card table" data-i18n-aria-label></section>
+<aside id="hint-feedback" class="hint-feedback" aria-label="Game feedback" data-i18n-aria-label hidden><svg class="hint-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6m-5 4h4m-3-21a7 7 0 0 0-4 13c1 .7 1.5 1.5 1.5 2h5c0-.5.5-1.3 1.5-2A7 7 0 0 0 11 1Z"/></svg><span id="hint-feedback-text" role="status" aria-live="polite"></span><button id="hint-feedback-close" type="button" aria-label="Dismiss game feedback" data-i18n-aria-label><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></aside>
+<p id="message" class="sr-only" role="status" aria-live="polite"></p>
 </main></div>
-<dialog id="rules-dialog" aria-labelledby="rules-title"><form method="dialog" class="dialog-card"><button class="dialog-close" aria-label="Close rules">×</button><p class="eyebrow">HOW TO PLAY</p><h2 id="rules-title">Game rules</h2><p id="rules-goal"></p><ul id="rules-list" class="rules-list"></ul><p id="rules-challenge" class="rules-copy"></p><button class="primary dialog-done">Back to the cards</button></form></dialog>
-<dialog id="settings-dialog" aria-labelledby="settings-title"><form method="dialog" class="dialog-card"><button class="dialog-close" aria-label="Close settings">×</button><h2 id="settings-title">Game settings</h2><div class="table-settings"><label class="difficulty-label" for="card-art"><span>Card art</span><select id="card-art" aria-describedby="art-note"><option value="contrast">High contrast</option><option value="engraved">Engraved</option><option value="woodcut">Woodcut</option><option value="random">Random Deck</option></select><small id="art-note" aria-live="polite"></small></label><label class="difficulty-label" for="difficulty"><span>Challenge</span><select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select></label></div><label class="difficulty-label variant-setting" id="klondike-options" for="empty-columns"><span>7-kabale · Empty columns</span><select id="empty-columns"><option value="kings">Kings only</option><option value="any">Any card</option></select></label><p>Changing the challenge or empty-column rule starts a new game. Your card style can change at any time.</p><button class="primary dialog-done">Back to the game</button></form></dialog>
-<dialog id="end-dialog" aria-labelledby="end-title" aria-describedby="end-message"><div class="dialog-card"><button id="end-close" type="button" class="dialog-close" aria-label="Close game result">×</button><div class="win-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><rect x="7" y="8" width="25" height="34" rx="4" transform="rotate(-12 20 25)"/><rect x="17" y="5" width="25" height="34" rx="4"/><path d="m23 22 5 5 9-11"/></svg></div><h2 id="end-title"></h2><p id="end-message"></p><p id="end-stats" class="end-stats" hidden></p><div class="end-buttons"><button id="end-undo" class="tool-button" type="button">Undo last move</button><button id="end-new" class="tool-button" type="button">New deal</button><button id="end-restart" class="tool-button" type="button">Replay this deal</button><button id="end-keep" class="tool-button" type="button">Keep playing</button></div></div></dialog>
-<aside id="hint-feedback" class="hint-feedback" aria-label="Hint feedback" hidden><svg class="hint-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6m-5 4h4m-3-21a7 7 0 0 0-4 13c1 .7 1.5 1.5 1.5 2h5c0-.5.5-1.3 1.5-2A7 7 0 0 0 11 1Z"/></svg><span id="hint-feedback-text" role="status" aria-live="polite"></span><button id="hint-feedback-close" type="button" aria-label="Dismiss hint feedback"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></aside>
-<button id="skip-finish" class="primary" type="button" hidden>Skip animation</button>
+<dialog id="rules-dialog" aria-labelledby="rules-title"><form method="dialog" class="dialog-card"><button class="dialog-close" aria-label="Close rules" data-i18n-aria-label>×</button><p class="eyebrow" data-i18n>HOW TO PLAY</p><h2 id="rules-title" data-i18n>Game rules</h2><p id="rules-goal"></p><ul id="rules-list" class="rules-list"></ul><p id="rules-challenge" class="rules-copy"></p><button class="primary dialog-done" data-i18n>Back to the cards</button></form></dialog>
+<dialog id="settings-dialog" aria-labelledby="settings-title">
+  <form method="dialog" class="dialog-card settings-card">
+    <header class="settings-header">
+      <h2 id="settings-title" data-i18n>Game settings</h2>
+      <button class="dialog-close" aria-label="Close settings" data-i18n-aria-label>×</button>
+    </header>
+    <div class="settings-language">
+      <label for="language" data-i18n>Language</label>
+      <select id="language">
+        <option value="en" lang="en">English</option>
+        <option value="da" lang="da">Dansk</option>
+      </select>
+    </div>
+    <fieldset class="settings-section">
+      <legend data-i18n>Cards</legend>
+      <div class="settings-fields">
+        <label class="settings-field">
+          <span data-i18n>Card art</span>
+          <select id="card-art" aria-describedby="art-note">
+            <option value="contrast" data-i18n>High contrast</option>
+            <option value="engraved" data-i18n>Engraved</option>
+            <option value="woodcut" data-i18n>Woodcut</option>
+            <option value="random" data-i18n>Random Deck</option>
+          </select>
+          <small id="art-note" aria-live="polite" hidden></small>
+        </label>
+        <label class="settings-field">
+          <span data-i18n>Rank and suit size</span>
+          <select id="card-index-size">
+            <option value="small" data-i18n>Small</option>
+            <option value="standard" selected data-i18n>Standard</option>
+            <option value="large" data-i18n>Large</option>
+          </select>
+        </label>
+      </div>
+    </fieldset>
+    <fieldset class="settings-section">
+      <legend data-i18n>Game</legend>
+      <div class="settings-fields">
+        <label class="settings-field">
+          <span data-i18n>Challenge</span>
+          <select id="difficulty" aria-describedby="settings-redeal-note">
+            <option value="easy" data-i18n>Easy</option>
+            <option value="normal" selected data-i18n>Normal</option>
+            <option value="hard" data-i18n>Hard</option>
+          </select>
+        </label>
+        <label class="settings-field" id="klondike-options" hidden>
+          <span data-i18n>Empty columns</span>
+          <select id="empty-columns" aria-describedby="settings-redeal-note">
+            <option value="kings" data-i18n>Kings only</option>
+            <option value="any" data-i18n>Any card</option>
+          </select>
+        </label>
+      </div>
+      <p id="settings-redeal-note" data-i18n>Changes in this section start a new deal.</p>
+    </fieldset>
+    <div class="settings-footer"><button class="primary" value="done" data-i18n>Done</button></div>
+  </form>
+</dialog>
+<dialog id="end-dialog" aria-labelledby="end-title" aria-describedby="end-message"><div class="dialog-card"><button id="end-close" type="button" class="dialog-close" aria-label="Close game result" data-i18n-aria-label>×</button><div class="win-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><rect x="7" y="8" width="25" height="34" rx="4" transform="rotate(-12 20 25)"/><rect x="17" y="5" width="25" height="34" rx="4"/><path d="m23 22 5 5 9-11"/></svg></div><h2 id="end-title"></h2><p id="end-message"></p><p id="end-stats" class="end-stats" hidden></p><div class="end-buttons"><button id="end-undo" class="tool-button" type="button" data-i18n>Undo last move</button><button id="end-new" class="tool-button" type="button" data-i18n>New deal</button><button id="end-restart" class="tool-button" type="button" data-i18n>Replay this deal</button><button id="end-keep" class="tool-button" type="button" data-i18n>Keep playing</button></div></div></dialog>
+<button id="skip-finish" class="primary" type="button" hidden data-i18n>Skip animation</button>
 <script type="module" src="src/app.js"></script></body></html>

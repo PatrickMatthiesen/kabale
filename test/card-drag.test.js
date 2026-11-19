@@ -99,6 +99,16 @@ test('pointer cancellation cleans up an active drag',()=>{
   assert.equal(h.bodyClasses.has('dragging-cards'),false);
 });
 
+test('window blur cancels an active drag and never drops the card',()=>{
+  const h=harness();
+  h.move(30,30);
+  h.win('blur');
+  h.up();
+  assert.deepEqual(h.events,['start','cancel']);
+  assert.equal(h.bodyClasses.has('dragging-cards'),false);
+  assert.equal(h.capture.has(7),false);
+});
+
 test('a touch tap below the drag threshold does not start a drag',()=>{
   const h=harness();
   h.move(24,24);

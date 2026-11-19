@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { boardLayout } from '../src/board-layout.js';
+import { cardIndexScales } from '../src/game-settings.js';
 
 test('all game columns fit narrow phones, larger phones and desktop boards', () => {
   for (const mode of ['klondike','spider','freecell','pyramid']) {
@@ -33,10 +34,10 @@ test('available height constrains card size on short viewports', () => {
 test('phone and desktop stacks expose the complete fluid rank and suit labels', () => {
   for (const mode of ['spider','freecell','klondike','pyramid']) for (const width of [260,274,300,336,354,390,640,1080,1680]) {
     const layout = boardLayout(mode,width);
-    const indexSize=Math.min(layout.cardWidth*.46,Math.max(12,Math.min(layout.cardWidth*.4,layout.cardWidth*.2+14)));
-    const indexInset=Math.max(2,Math.min(6,layout.cardWidth*.03));
-    const labelHeight=indexSize*1.4025;
-    assert.ok(layout.faceStep >= labelHeight+indexInset+4, `complete label is covered in ${mode} at ${width}px`);
+    const large = boardLayout(mode,width,Infinity,{indexScale:cardIndexScales.large});
+    const labelHeight=Math.min(large.cardWidth*.44,cardIndexScales.large*Math.min(large.cardWidth*.37,large.cardWidth*.16+9));
+    const indexInset=Math.max(2,Math.min(5,large.cardWidth*.03));
+    assert.ok(large.faceStep >= labelHeight+indexInset+2, `complete label is covered in ${mode} at ${width}px`);
     assert.ok(layout.columns * layout.cardWidth + (layout.columns - 1) * layout.gap <= width);
     assert.ok(layout.faceStep < layout.cardWidth * 14 / 9);
   }
@@ -72,12 +73,24 @@ test('Pyramid accounts for all seven overlapping rows and reserve separation', (
   assert.ok(tight.cardWidth >= 40);
 });
 
-test('compact rank and suit labels allow larger cards in a tight board', () => {
+test('a smaller rank and suit size reduces overlap spacing in a tight board', () => {
   const stacks = [{ face: 12, back: 0 }];
-  const regular = boardLayout('klondike',1400,720,{ stacks });
-  const compact = boardLayout('klondike',1400,720,{ stacks, compact: true });
-  assert.ok(compact.faceStep < regular.faceStep);
-  assert.ok(compact.cardWidth > regular.cardWidth);
+  const large = boardLayout('klondike',940,440,{ stacks, indexScale:cardIndexScales.large });
+  const small = boardLayout('klondike',940,440,{ stacks, indexScale:cardIndexScales.small });
+  assert.ok(small.faceStep < large.faceStep);
+  assert.ok(small.cardWidth > large.cardWidth);
+});
+
+test('Klondike side reserves give long stacks room to use the board width', () => {
+  const stacks = [10, 9, 0, 9, 0, 0, 6].map(face => ({face}));
+  const rail = boardLayout('klondike',940,480,{stacks,sideReserves:true});
+  const topRow = boardLayout('klondike',940,480,{stacks});
+  assert.equal(rail.fits,true);
+  assert.ok(rail.cardWidth>=100);
+  assert.ok(rail.cardWidth>topRow.cardWidth);
+  const shortTable = boardLayout('klondike',1040,395,{stacks,sideReserves:true,indexScale:cardIndexScales.large});
+  assert.equal(shortTable.fits,true,'a short, wide table can use tighter stacks without scrolling');
+  assert.ok(shortTable.cardWidth>=65);
 });
 
 test('FreeCell side reserves fit in the width and height calculations', () => {

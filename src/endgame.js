@@ -1,17 +1,25 @@
 import { applyMove, legalMoves } from './engine.js';
+import { translate } from './i18n.js';
 
 /** Report only a win or a position with no legal action, including stock actions. */
-export function gameOutcome(game) {
-  if (game.won) return {kind:'won',title:'Well played!',message:'You cleared the table.'};
+export function gameOutcome(game, {language = 'en', canUndo = true} = {}) {
+  const tr = text => translate(language,text);
+  if (game.won) return {kind:'won',title:tr('Well played!'),message:tr('You cleared the table.')};
   if (legalMoves(game).length) return {kind:'playing',title:'',message:''};
   const easy=game.difficulty==='easy';
   const details={
-    klondike:easy?'The stock and waste are empty, and no card can move to a column or foundation. Undo a move to try another route.':'The stock and waste are empty, and no legal card move remains.',
-    spider:easy?'No card can move between columns, and the stock cannot be dealt. Undo a move to try another route.':'No tableau move or deal is available.',
-    freecell:easy?'No card fits a column, free cell, or foundation. Undo a move to try another route.':'No legal card move remains.',
-    pyramid:easy?'No available cards add to 13, no King can be removed, and no stock pass remains. Undo a move to try another route.':'No legal pair, King removal, or stock pass remains.'
+    klondike:easy?'The stock and waste are empty, and no card can move to a column or foundation.':'The stock and waste are empty, and no legal card move remains.',
+    spider:easy?'No card can move between columns, and the stock cannot be dealt.':'No tableau move or deal is available.',
+    freecell:easy?'No card fits a column, free cell, or foundation.':'No legal card move remains.',
+    pyramid:easy?'No available cards add to 13, no King can be removed, and no stock pass remains.':'No legal pair, King removal, or stock pass remains.'
   }[game.mode] ?? 'No legal move remains.';
-  return {kind:'blocked',title:easy?'No moves left':'No legal moves',message:game.difficulty==='hard'?`${details} Restart this deal or start a new one.`:details};
+  const recovery = easy ? (canUndo ? 'Undo a move to try another route.' : 'Replay this deal or start a new one.')
+    : game.difficulty==='hard' ? 'Restart this deal or start a new one.' : null;
+  return {
+    kind:'blocked',
+    title:tr(easy?'No moves left':'No legal moves'),
+    message:recovery ? `${tr(details)} ${tr(recovery)}` : tr(details)
+  };
 }
 
 const allFaceUp=game=>[...game.cols.flat(),...(game.cells??[]).filter(Boolean),...(game.waste??[])].every(card=>card.up);

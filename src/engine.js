@@ -15,7 +15,28 @@ const parts=k=>String(k).split(':');
 function src(g,k){const [t,x,y]=parts(k);if(t==='col'){const a=g.cols[+x];return a?{a,i:y===undefined?a.length-1:+y,t,x:+x}:null}if(t==='cell')return g.cells[+x]?{a:[g.cells[+x]],i:0,t,x:+x}:null;if(t==='waste')return g.waste?.length?{a:g.waste,i:g.waste.length-1,t}:null;if(t==='found')return g.mode!=='spider'&&g.found?.[+x]?.length?{a:g.found[+x],i:g.found[+x].length-1,t,x:+x}:null;return null;}
 function seq(g,k){const s=src(g,k);return s?{...s,c:s.a.slice(s.i)}:null}
 function tableOK(g,c,to){const [t,x]=parts(to),a=g.cols[+x];if(t!=='col'||!a||!runValid(c,g.mode)||c[0]?.id&&a.some(v=>v.id===c[0].id))return false;const top=a.at(-1);if(g.mode==='spider')return !top||top.r===c[0].r+1;if(g.mode==='freecell'&&c.length>(g.cells.filter(v=>!v).length+1)*2**g.cols.filter((v,i)=>!v.length&&i!==+x).length)return false;return top?top.r===c[0].r+1&&red(top)!==red(c[0]):g.mode==='freecell'||(g.mode==='klondike'&&g.emptyColumns==='any')||c[0].r===13;}
-function valid(g,f,t){if(f===t)return false;const [tt,tx]=parts(t),s=seq(g,f);if(!s)return false;const c=s.c[0],n=s.c.length;if(!c||!c.up)return false;if(tableOK(g,s.c,t))return true;if(tt==='cell')return g.mode==='freecell'&&Number.isInteger(+tx)&&+tx>=0&&+tx<g.cells.length&&!g.cells[+tx]&&n===1;if(tt==='found'){const a=g.found[+tx];return a&&n===1&&g.mode!=='spider'&&(a.length?a.at(-1).s===c.s&&a.at(-1).r+1===c.r:c.r===1);}return false;}
+function fitsFoundation(pile, card) {
+  if (!pile) return false;
+  const top = pile.at(-1);
+  return top ? top.s === card.s && top.r + 1 === card.r : card.r === 1;
+}
+function valid(g, from, to) {
+  if (from === to) return false;
+  const [kind, index] = parts(to);
+  const source = seq(g, from);
+  const card = source?.c[0];
+  if (!card?.up) return false;
+  if (tableOK(g, source.c, to)) return true;
+  if (source.c.length !== 1) return false;
+  if (kind === 'cell') {
+    return g.mode === 'freecell' && Number.isInteger(+index) && +index >= 0 && +index < g.cells.length && !g.cells[+index];
+  }
+  if (kind === 'found') {
+    if (g.mode === 'spider' || (g.mode === 'freecell' && source.t === 'found')) return false;
+    return fitsFoundation(g.found[+index], card);
+  }
+  return false;
+}
 export function canMove(g,f,t,start){return valid(g,start===undefined?`col:${f}`:`col:${f}:${start}`,`col:${t}`)}
 function pop(g,s){const out=s.a.splice(s.i);if(s.t==='cell')g.cells[s.x]=null;if(s.t==='col'&&s.a.length)s.a.at(-1).up=true;return out;}
 function spiderRuns(g,a){while(a.length>=13){const r=a.slice(-13);if(!r.every((c,i)=>c.up&&c.s===r[0].s&&c.r===13-i))break;a.splice(-13);g.found.push(r);if(a.length)a.at(-1).up=true;}g.won=g.found.length===8;}
@@ -45,12 +66,31 @@ export function movesFrom(g, from) {
 }
 export function legalMoves(g){if(g.mode==='pyramid'){const k=[];for(let y=0;y<7;y++)for(let x=0;x<=y;x++)if(pyramidPlayable(g,y,x))k.push(`p:${y}:${x}`);if(g.pairWaste.length)k.push('pw');const a=[];for(const f of k){const c=f==='pw'?g.pairWaste.at(-1):g.cols[parts(f)[1]][parts(f)[2]];if(c.r===13)a.push({from:f,to:f,label:'Remove king'});for(const t of k)if(t!==f){const d=t==='pw'?g.pairWaste.at(-1):g.cols[parts(t)[1]][parts(t)[2]];if(c.r+d.r===13)a.push({from:f,to:t,label:'Pair to 13'});}}if(g.stock.length||g.pairWaste.length&&g.redealsLeft)a.push({from:'stock',to:'',label:'Deal'});return a;}
  const keys=[];g.cols.forEach((a,i)=>a.forEach((_,j)=>{if(runValid(a.slice(j),g.mode))keys.push(`col:${i}:${j}`)}));g.cells.forEach((c,i)=>{if(c)keys.push(`cell:${i}`)});if(g.waste.length)keys.push('waste');if(g.mode!=='spider')g.found.forEach((a,i)=>{if(a.length)keys.push(`found:${i}`)});const out=keys.flatMap(f=>movesFrom(g,f));if((g.mode==='klondike'&&(g.stock.length||g.waste.length))||(g.mode==='spider'&&g.stock.length>=10&&g.cols.every(c=>c.length)))out.push({from:'stock',to:'',label:'Deal'});return out;}
+function autoMoveFreeCell(g, key, source) {
+  if (source.t === 'found') return false;
+  const moves = movesFrom(g, key);
+  const parent = source.a[source.i - 1];
+  const foundationReady = card => card?.up && g.found.some(pile => fitsFoundation(pile, card));
+  const uncoversFoundationCard = foundationReady(parent);
+  const targetColumn = ({to}) => to.startsWith('col:') ? g.cols[parts(to)[1]] : undefined;
+  const buildsOnColumn = move => {
+    const top = targetColumn(move)?.at(-1);
+    return top && !foundationReady(top) &&
+      (uncoversFoundationCard || !parent || top.r !== parent.r || red(top) !== red(parent));
+  };
+  const move = moves.find(move => move.to.startsWith('found:'))
+    ?? moves.find(buildsOnColumn)
+    ?? ((source.t === 'cell' || uncoversFoundationCard) ? moves.find(move => targetColumn(move)?.length === 0) : null)
+    ?? (uncoversFoundationCard ? moves.find(move => move.to.startsWith('cell:')) : null);
+  return move ? applyMove(g, key, move.to) : false;
+}
 export function autoMove(g,key) {
   if (g.mode === 'pyramid') {
     return legalMoves(g).some(m => m.from === key && applyMove(g,key,m.to));
   }
   const source = seq(g,key);
   if (!source) return false;
+  if (g.mode === 'freecell') return autoMoveFreeCell(g,key,source);
   const targets = [
     ...g.found.map((_,i) => `found:${i}`),
     ...g.cols.flatMap((a,i) => a.length ? [`col:${i}`] : []),

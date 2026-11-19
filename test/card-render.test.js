@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
 import { cardFace } from '../src/card-art.js';
+import { translate } from '../src/i18n.js';
 
 const source = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
 const rank = c => ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'][c.r];
@@ -10,7 +11,7 @@ function renderer(style) {
   const context = {
     cardFace, art: {resolved: style}, cardPixels: 34,
     window: {devicePixelRatio: 3}, selected: null, hint: null, g: {},
-    getHintRole: () => '', rank,
+    getHintRole: () => '', rank, tr: (text,values) => translate('en',text,values),
     suitNames: {'♣':'clubs','♠':'spades','♥':'hearts','♦':'diamonds'},
     sourceLabel: () => 'Column 1'
   };
@@ -54,6 +55,7 @@ test('high-contrast faces show rank and suit in a single row without loading art
   assert.match(face,/aria-label="10 of clubs, Column 1"/);
   assert.match(face,/card-index-top"><b>10<\/b><span>♣\uFE0E<\/span>/u);
   assert.match(face,/contrast-suit">♣\uFE0E/u);
-  assert.doesNotMatch(face,/background-image|card-index-bottom/);
+  assert.match(face,/card-index-bottom"><b>10<\/b><span>♣\uFE0E<\/span>/u);
+  assert.doesNotMatch(face,/background-image/);
   assert.doesNotMatch(renderCard({r:10,s:'♣',up:false},'col:0:0'),/♣|contrast-suit/u);
 });

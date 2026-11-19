@@ -8,6 +8,7 @@ import * as hints from '../src/hints.js';
 import {planKlondikeHint} from '../src/klondike-hints.js';
 import {rememberStock,restoreStockMemory} from '../src/stock-memory.js';
 import * as settings from '../src/game-settings.js';
+import * as i18n from '../src/i18n.js';
 import {wasteLayout} from '../src/waste-layout.js';
 import {boardLayout} from '../src/board-layout.js';
 import {gameRules} from '../src/game-rules.js';
@@ -31,7 +32,7 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
   }
   document.getElementById=id=>{if(!elements.has(id))elements.set(id,el(id));return elements.get(id);};
   document.createElement=()=>el();
-  const context={...engine,...art,...hints,...settings,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,planKlondikeHint,rememberStock,restoreStockMemory,createCardMotion:motionFactory,document,
+  const context={...engine,...art,...hints,...settings,...i18n,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,planKlondikeHint,rememberStock,restoreStockMemory,createCardMotion:motionFactory,document,
     window:{localStorage:{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v)},devicePixelRatio:1,innerHeight:1000,scrollY:0,addEventListener(){}},
     getComputedStyle:()=>({paddingLeft:'8px',paddingRight:'8px'}),ResizeObserver:class{observe(){}},confirm:()=>true,
     setTimeout:()=>1,clearTimeout(){},setInterval(){},Date,console,structuredClone};
@@ -140,7 +141,8 @@ test('Hint gives visible feedback when all remaining suggestions repeat, without
   h.get('hint-feedback-close').onclick();assert.equal(h.get('hint-feedback').hidden,true);
   assert.equal(h.get('message')['aria-live'],'polite');
   h.get('hint').onclick();h.api.choose('col:0:0');
-  assert.equal(h.get('hint-feedback').hidden,true);
+  assert.equal(h.get('hint-feedback').dataset.hint,'false');
+  assert.match(h.get('hint-feedback-text').textContent,/no legal move for that card/);
 });
 
 test('a stock recycle hint marks the empty Redeal pile and explains its action',()=>{
@@ -151,6 +153,82 @@ test('a stock recycle hint marks the empty Redeal pile and explains its action',
   assert.match(h.get('hint-feedback-text').textContent,/Recycle the waste into the stock.*known waste card/);
   assert.match(h.get('board').innerHTML,/class="pile hinted hint-source" data-key="stock"/);
   assert.equal(h.get('end-dialog').open,false);
+});
+
+test('FreeCell hints name both face-up cards and mark the right handles',()=>{
+  const g=engine.deal('freecell');
+  g.cols=[[c(9,'♦'),c(7,'♣')],[c(8,'♥')],[],[],[],[],[],[]];
+  const single=app(g);
+  single.get('hint').onclick();
+  assert.equal(single.get('hint-feedback-text').textContent,'Move 7♣\uFE0E of clubs onto 8♥\uFE0E of hearts.');
+  assert.match(single.get('board').innerHTML,/class="[^"]*hint-source"[^>]*data-key="col:0:1"/);
+  assert.match(single.get('board').innerHTML,/class="[^"]*hint-destination"[^>]*data-key="col:1:0"/);
+  assert.match(single.get('board').innerHTML,/data-key="cell:1" aria-label="Free cell 2"/);
+  single.get('hint-feedback-close').onclick();
+  assert.doesNotMatch(single.get('board').innerHTML,/hint-source|hint-destination/);
+
+  g.cols[0].push(c(6,'♥'));
+  const stack=app(g);
+  stack.get('hint').onclick();
+  assert.equal(stack.get('hint-feedback-text').textContent,'Move the stack starting with 7♣\uFE0E of clubs onto 8♥\uFE0E of hearts.');
+  assert.match(stack.get('board').innerHTML,/class="[^"]*hint-source"[^>]*data-key="col:0:1"/);
+});
+
+test('Spider hints identify the columns of matching cards in both languages',()=>{
+  const g=engine.deal('spider','easy');
+  g.cols=[[c(7)],[c(8)],[{...c(7),id:'second-seven'}],[{...c(8),id:'second-eight'}],[],[],[],[],[],[]];
+  g.stock=[];
+  const h=app(g);
+  h.get('hint').onclick();
+  assert.equal(h.get('hint-feedback-text').textContent,'Move 7♠\uFE0E of spades from column 1 onto 8♠\uFE0E of spades in column 2.');
+  h.get('language').onchange({target:{value:'da'}});
+  h.get('hint').onclick();
+  assert.equal(h.get('hint-feedback-text').textContent,'Læg spar 7♠\uFE0E fra kolonne 1 oven på spar 8♠\uFE0E i kolonne 2.');
+});
+
+test('rank and suit size is saved independently of the deal and deck',()=>{
+  const h=app(board());
+  h.get('card-art').onchange({target:{value:'woodcut'}});
+  const game=h.api.state();
+  h.get('card-index-size').onchange({target:{value:'large'}});
+  assert.equal(h.api.state(),game);
+  assert.equal(h.get('card-art').value,'woodcut');
+  h.api.flush();
+  const restored=app(null,h.stored);
+  assert.equal(restored.get('card-index-size').value,'large');
+  assert.equal(restored.get('card-art').value,'woodcut');
+  assert.equal(restored.api.state().moves,game.moves);
+});
+
+test('Danish persists, translates live hints and leaves the current deal in place',()=>{
+  const g=engine.deal('freecell');
+  g.cols=[[c(9,'♦'),c(7,'♣')],[c(8,'♥')],[],[],[],[],[],[]];
+  g.moves=14;
+  const h=app(g);
+  const original=h.api.state();
+  h.get('language').onchange({target:{value:'da'}});
+  assert.equal(h.api.state(),original);
+  assert.equal(h.get('moves').textContent,14);
+  assert.equal(h.get('rules-title').textContent,'Regler for FreeCell');
+  assert.match(h.get('board').innerHTML,/Friplads/);
+  h.get('hint').onclick();
+  assert.equal(h.get('hint-feedback-text').textContent,'Læg klør 7♣\uFE0E oven på hjerter 8♥\uFE0E.');
+  h.api.flush();
+  const restored=app(null,h.stored);
+  assert.equal(restored.get('language').value,'da');
+  assert.equal(restored.api.state().moves,14);
+  restored.get('language').onchange({target:{value:'en'}});
+  assert.equal(restored.get('rules-title').textContent,'FreeCell rules');
+});
+
+test('failed session writes show visible feedback without re-rendering the board',()=>{
+  const h=app(board());
+  h.get('board').innerHTML='keep the board';
+  h.stored.set=()=>{throw new Error('Storage is full');};
+  h.api.flush();
+  assert.equal(h.get('board').innerHTML,'keep the board');
+  assert.equal(h.get('hint-feedback').hidden,false);
+  assert.match(h.get('hint-feedback-text').textContent,/storage is unavailable/i);
 });
 
 test('a saved game started mid-pass remembers seen stock across redeal, reload and undo',()=>{

@@ -83,3 +83,62 @@ test('empty-column option leaves FreeCell and Spider rules unchanged', () => {
   spider.cols[0]=[{r:7,s:'♠',up:true,id:'7s'}];
   assert.equal(applyMove(spider,'col:0','col:1'),true);
 });
+
+const freeCard = (r,s) => ({r,s,id:`${r}${s}`,up:true});
+
+test('FreeCell auto move skips free-cell shuffles and prefers an ordinary build', () => {
+  const g = deal('freecell');
+  const card = freeCard(7,'♥');
+  g.cols = Array.from({length:8},() => [freeCard(10,'♣')]);
+  g.cells[0] = card;
+  const before = structuredClone(g);
+  assert.equal(autoMove(g,'cell:0'),false);
+  assert.deepEqual(g,before);
+  assert.equal(applyMove(g,'cell:0','cell:1'),true);
+  g.cols[2] = [freeCard(8,'♠')];
+  assert.equal(autoMove(g,'cell:1'),true);
+  assert.equal(g.cols[2].at(-1),card);
+  assert.equal(g.cells[1],null);
+});
+
+test('FreeCell auto move can uncover a foundation card and ignores equivalent column swaps', () => {
+  const g = deal('freecell');
+  const ace = freeCard(1,'♠');
+  const blocker = freeCard(9,'♥');
+  g.cols = [[ace,blocker],[freeCard(10,'♦'),freeCard(9,'♣')],[],[freeCard(10,'♥')]];
+  assert.equal(autoMove(g,'col:1:1'),false);
+  assert.equal(autoMove(g,'col:0:1'),true);
+  assert.deepEqual(g.cols[0],[ace]);
+  assert.deepEqual(g.cols[2],[blocker]);
+  assert.equal(autoMove(g,'col:0:0'),true);
+  assert.equal(g.found[0].at(-1),ace);
+  assert.equal(autoMove(g,'found:0'),false);
+  assert.equal(applyMove(g,'found:0','found:1'),false);
+  assert.equal(applyMove(g,'found:0','cell:0'),true);
+});
+
+test('FreeCell counts temporary columns without counting the destination', () => {
+  const g = deal('freecell','hard');
+  const run = [freeCard(11,'♠'),freeCard(10,'♥'),freeCard(9,'♣')];
+  g.cols = [run.slice(),[],[freeCard(13,'♦')]];
+  g.cells[0] = freeCard(4,'♦');
+  assert.equal(canMove(g,0,1,0),false);
+  g.cols.push([]);
+  assert.equal(move(g,0,1,0),true);
+  assert.deepEqual(g.cols[1],run);
+  assert.equal(g.moves,1);
+});
+
+test('FreeCell auto move keeps both foundation-ready parents exposed', () => {
+  const g = deal('freecell');
+  const seven = freeCard(7,'♥');
+  g.found = ['♠','♣'].map(s => Array.from({length:7},(_,i) => freeCard(i+1,s))).concat([[],[]]);
+  g.cols = [[freeCard(8,'♠'),seven],[freeCard(8,'♣')],[]];
+  assert.equal(canMove(g,0,1,1),true);
+  assert.equal(autoMove(g,'col:0:1'),true);
+  assert.equal(g.cols[0].length,1);
+  assert.equal(g.cols[1].length,1);
+  assert.deepEqual(g.cols[2],[seven]);
+  assert.equal(autoMove(g,'col:2:0'),false);
+  assert.equal(g.moves,1);
+});
