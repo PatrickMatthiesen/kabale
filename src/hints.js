@@ -82,6 +82,21 @@ export function selectHint(game, visited = new Set()) {
   return best;
 }
 
+/** Resolve only cards the player can already see. */
+export function visibleHintCard(game, key) {
+  const [kind, column, index] = key.split(':');
+  let card;
+  switch (kind) {
+    case 'col': card = game.cols[column]?.[index ?? game.cols[column].length - 1]; break;
+    case 'found': card = game.found[column]?.at(-1); break;
+    case 'cell': card = game.cells[column]; break;
+    case 'waste': card = game.waste.at(-1); break;
+    case 'pw': card = game.pairWaste?.at(-1); break;
+    case 'p': card = game.cols[column]?.[index]; break;
+  }
+  return card?.up ? card : null;
+}
+
 /** Mark one visible source and one destination, never the hidden cards behind them. */
 export function hintRole(game, hint, key, faceUp) {
   if (!hint || (!faceUp && key !== 'stock')) return '';
