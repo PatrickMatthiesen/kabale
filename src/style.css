@@ -116,3 +116,73 @@
 @media (prefers-reduced-motion: reduce) {
   .card-motion-overlay { display: none; }
 }
+
+/* The high-contrast deck puts both identifiers in the exposed row. */
+.card-face[data-art="contrast"] {
+  color: #121b29;
+  background: #fffefa;
+  box-shadow: inset 0 0 0 1px #20273855;
+}
+.card.red .card-face[data-art="contrast"] { color: #b20c26; }
+.card-face[data-art="contrast"] .card-index {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: baseline;
+  width: auto;
+  inset-inline: clamp(1.5px,3cqw,6px);
+  color: inherit;
+  line-height: .9;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+.card-face[data-art="contrast"] .card-index span { font-size: .8em; }
+.contrast-suit {
+  position: absolute;
+  inset: 28% 0 0;
+  display: grid;
+  place-items: center;
+  font: 700 min(74cqw, 112px)/1 Georgia, "Times New Roman", serif;
+}
+
+/* Fit the cards beneath the controls. Very long stacks can scroll inside the felt. */
+#board {
+  --reserve-gap: 12px;
+  min-height: 0;
+  height: var(--table-height, auto);
+  scrollbar-gutter: stable;
+}
+#board .reserve-row { margin-bottom: var(--reserve-gap); }
+#board .tableau { margin-bottom: 0; }
+#board[data-mode="pyramid"] .pyramidrow { margin-bottom: calc(var(--card-h) * -.68); }
+#board[data-mode="pyramid"] .pyramidrow:nth-child(7) { margin-bottom: var(--reserve-gap); }
+#board[data-mode="pyramid"] .stockrow { margin-block: 0; }
+
+.freecell-rail { display: flex; gap: var(--layout-gap); }
+#board[data-side-reserves="true"] {
+  --rail-width: calc(var(--card-w) * .64);
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0,1fr) var(--rail-width);
+  grid-template-areas: "cells tableau foundations";
+  gap: var(--layout-gap);
+  align-items: start;
+  align-content: start;
+}
+#board[data-side-reserves="true"] .reserve-row { display: contents; }
+#board[data-side-reserves="true"] .freecell-rail {
+  --card-w: var(--rail-width);
+  --card-h: calc(var(--card-w) * 14 / 9);
+  flex-direction: column;
+}
+#board[data-side-reserves="true"] .freecell-rail > .pile { flex: none; }
+#board[data-side-reserves="true"] .freecell-cells { grid-area: cells; }
+#board[data-side-reserves="true"] .freecell-foundations { grid-area: foundations; }
+#board[data-side-reserves="true"] .tableau { grid-area: tableau; }
+@media (max-width: 1100px) {
+  #board { --reserve-gap: 8px; }
+}
+@media (min-width: 1101px) and (max-height: 820px) {
+  body { padding-block: 8px; }
+  .room { min-height: calc(100svh - 16px); }
+  .topbar { min-height: 0; padding-block: 7px; }
+  main { padding-block: 8px 10px; }
+}

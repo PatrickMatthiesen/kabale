@@ -105,3 +105,11 @@ test('a fresh art preference defaults to Random Deck without replacing saved cho
   assert.deepEqual(loadArt({getItem:()=>null},()=>.99),{choice:'random',resolved:'woodcut'});
   assert.deepEqual(loadArt({getItem:()=>JSON.stringify({choice:'engraved',resolved:'engraved'})},()=>.99),{choice:'engraved',resolved:'engraved'});
 });
+
+test('high contrast is a persistent fixed choice independent of illustrated deck randomization', () => {
+  let stored;
+  const storage={getItem:()=>stored,setItem:(_,value)=>{stored=value;}};
+  saveArt(storage,{choice:'contrast',resolved:'contrast'});
+  assert.deepEqual(loadArt(storage,()=>0),{choice:'contrast',resolved:'contrast'});
+  assert.equal(resolveArt('random',()=>.99),'woodcut');
+});

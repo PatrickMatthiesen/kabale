@@ -47,3 +47,13 @@ test('face-down markup never reveals any card identity or face asset', () => {
     assert.ok(!html.includes(s));
   }
 });
+
+test('high-contrast faces show rank and suit in a single row without loading artwork', () => {
+  const renderCard=renderer('contrast');
+  const face=renderCard({r:10,s:'♣',up:true},'col:0:0');
+  assert.match(face,/aria-label="10 of clubs, Column 1"/);
+  assert.match(face,/card-index-top"><b>10<\/b><span>♣\uFE0E<\/span>/u);
+  assert.match(face,/contrast-suit">♣\uFE0E/u);
+  assert.doesNotMatch(face,/background-image|card-index-bottom/);
+  assert.doesNotMatch(renderCard({r:10,s:'♣',up:false},'col:0:0'),/♣|contrast-suit/u);
+});

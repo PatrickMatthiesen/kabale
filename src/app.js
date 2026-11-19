@@ -55,21 +55,51 @@ function refreshArtResolution() {
   }
 }
 function fitBoard() {
+  if (finishPlayback) return;
   const style = getComputedStyle(board);
-  const width = board.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const pixels = value => parseFloat(value) || 0;
+  const width = board.clientWidth - pixels(style.paddingLeft) - pixels(style.paddingRight);
   const boardTop = board.getBoundingClientRect().top + window.scrollY;
-  const availableHeight = window.innerHeight - boardTop - 50;
-  const signature = `${g.mode}:${width}:${availableHeight}:${window.devicePixelRatio}`;
+  let below = pixels(getComputedStyle(document.body).paddingBottom)
+    + pixels(getComputedStyle($('table-main')).paddingBottom)
+    + pixels(getComputedStyle($('game-room')).borderBottomWidth);
+  for (const id of ['table-footer','end-actions']) {
+    const element = $(id);
+    if (element.hidden) continue;
+    const margins = getComputedStyle(element);
+    below += (element.getBoundingClientRect().height || 0) + pixels(margins.marginTop) + pixels(margins.marginBottom);
+  }
+  const boardHeight = Math.max(180,Math.floor(window.innerHeight - boardTop - below));
+  const availableHeight = boardHeight - pixels(style.paddingTop) - pixels(style.paddingBottom)
+    - pixels(style.borderTopWidth) - pixels(style.borderBottomWidth);
+  const reserveGap = pixels(style.getPropertyValue?.('--reserve-gap')) || 12;
+  const stacks = g.mode === 'pyramid' ? [] : g.cols.map(column => {
+    const covered = column.slice(0,-1);
+    const face = covered.filter(card=>card.up).length;
+    return {face,back:covered.length-face};
+  });
+  const compact = art.resolved === 'contrast';
+  const signature = JSON.stringify([g.mode,width,boardHeight,availableHeight,reserveGap,compact,stacks,window.devicePixelRatio]);
   if (signature === lastLayout || width <= 0) return;
   lastLayout = signature;
-  const layout = boardLayout(g.mode, width, availableHeight);
+  const options = {stacks,reserveGap,compact};
+  let layout = boardLayout(g.mode,width,availableHeight,options);
+  let sideReserves = false;
+  if (g.mode === 'freecell' && width >= 760) {
+    const side = boardLayout(g.mode,width,availableHeight,{...options,sideReserves:true});
+    if (side.fits && (!layout.fits || side.cardWidth > layout.cardWidth + 2)) {
+      layout = side;
+      sideReserves = true;
+    }
+  }
   cardPixels = layout.cardWidth;
-  for (const [name,value] of Object.entries({ 'card-w':layout.cardWidth, 'layout-gap':layout.gap, 'face-step':layout.faceStep, 'back-step':layout.backStep })) {
+  board.dataset.sideReserves = String(sideReserves);
+  for (const [name,value] of Object.entries({ 'table-height':boardHeight, 'card-w':layout.cardWidth, 'layout-gap':layout.gap, 'face-step':layout.faceStep, 'back-step':layout.backStep })) {
     board.style.setProperty(`--${name}`, `${value}px`);
   }
   refreshArtResolution();
 }
-new ResizeObserver(fitBoard).observe(board);
+new ResizeObserver(() => fitBoard()).observe(board);
 window.addEventListener('resize', () => {
   fitBoard();
   if (finishPlayback) finishPlayback(false);
@@ -96,8 +126,17 @@ function card(c, key, top = 0, blocked = false) {
   const hintRole = blocked ? '' : getHintRole(g, hint, key, face);
   const isHint = !!hintRole;
   const label = face ? `${rank(c)} of ${suitNames[c.s]}, ${sourceLabel(key)}` : `Face down card, ${sourceLabel(key)}`;
-  const image = face ? cardFace(c, art.resolved,{cardWidth:cardPixels,pixelRatio:window.devicePixelRatio || 1}) : null;
-  const illustration = image ? `<span class="card-face" data-art="${art.resolved}" aria-hidden="true"><span class="full-face" data-rank="${c.r}" data-suit="${c.s}" style="background-image:url('${image.url}');background-size:${image.size};background-position:${image.position}"></span><span class="card-index card-index-top"><b>${rank(c)}</b><span>${c.s}\uFE0E</span></span><span class="card-index card-index-bottom"><b>${rank(c)}</b><span>${c.s}\uFE0E</span></span></span>` : '<span class="back-medallion" aria-hidden="true">K</span>';
+  let illustration = '<span class="back-medallion" aria-hidden="true">K</span>';
+  if (face) {
+    const value = `<b>${rank(c)}</b><span>${c.s}\uFE0E</span>`;
+    const index = `<span class="card-index card-index-top">${value}</span>`;
+    if (art.resolved === 'contrast') {
+      illustration = `<span class="card-face" data-art="contrast" aria-hidden="true">${index}<span class="contrast-suit">${c.s}\uFE0E</span></span>`;
+    } else {
+      const image = cardFace(c, art.resolved,{cardWidth:cardPixels,pixelRatio:window.devicePixelRatio || 1});
+      illustration = `<span class="card-face" data-art="${art.resolved}" aria-hidden="true"><span class="full-face" data-rank="${c.r}" data-suit="${c.s}" style="background-image:url('${image.url}');background-size:${image.size};background-position:${image.position}"></span>${index}<span class="card-index card-index-bottom">${value}</span></span>`;
+    }
+  }
   return `<button type="button" class="card ${face ? 'illustrated' : 'back'} ${face && ['♥','♦'].includes(c.s) ? 'red' : ''} ${isSelected ? 'selected' : ''} ${isHint ? 'hinted' : ''} ${hintRole}" style="top:${typeof top === 'number' ? `${top}px` : top}" data-key="${key}" aria-label="${label}" aria-pressed="${isSelected}" ${blocked || !face && key !== 'stock' ? 'disabled' : ''}>${illustration}</button>`;
 }
 function waste(cards, key) {
@@ -125,10 +164,12 @@ function renderBoard(display) {
     html += '<div class="row stockrow">' + pile(display.stock.length ? card({up: false}, 'stock') : '', 'stock', display.stock.length ? `Stock · ${display.stock.length}` : 'Redeal') + waste(display.pairWaste, 'pw') + '</div>';
   } else {
     html = '<div class="row reserve-row">';
-    if (display.mode === 'freecell') html += display.cells.map((c,i) => pile(c ? card(c,`cell:${i}`) : '',`cell:${i}`,'Free cell')).join('');
+    if (display.mode === 'freecell') html += '<div class="freecell-rail freecell-cells">' + display.cells.map((c,i) => pile(c ? card(c,`cell:${i}`) : '',`cell:${i}`,'Free cell')).join('') + '</div>';
     else html += pile(display.stock.length ? card({up:false},'stock') : '', 'stock', display.stock.length ? `Stock · ${display.stock.length}` : 'Redeal') + (display.mode === 'klondike' ? waste(display.waste, 'waste') : '');
     html += '<span class="reserve-spacer"></span>';
+    if (display.mode === 'freecell') html += '<div class="freecell-rail freecell-foundations">';
     html += display.mode === 'spider' ? `<span class="run-counter">${display.found.length}<small>of 8 runs</small></span>` : display.found.map((f,i) => pile(f.length ? card(f.at(-1),`found:${i}`) : '',`found:${i}`,'Ace')).join('');
+    if (display.mode === 'freecell') html += '</div>';
     html += '</div><div class="row tableau">' + display.cols.map(tableau).join('') + '</div>';
   }
   board.innerHTML = html;
@@ -166,6 +207,7 @@ function render(newWin = false) {
   $('hint-feedback-text').textContent=hintFeedback;
   if (focusKey) board.querySelector(`button[data-key="${focusKey}"]:not(:disabled)`)?.focus({preventScroll:true});
   updateEndgame(newWin);
+  fitBoard();
 }
 function updateEndgame(newWin = false) {
   endgameUI?.update(g,{canUndo:past.length>0,time:$('time').textContent,deferResult:celebrating,newWin});

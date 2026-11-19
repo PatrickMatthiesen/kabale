@@ -1,5 +1,6 @@
 import { artManifest } from './art-manifest.js';
 export const artStyles = ['engraved', 'woodcut'];
+const fixedArtChoices = ['contrast', ...artStyles];
 
 export function selectArtVariant(variants, cardWidth = 160, pixelRatio = 1) {
   const width = Number.isFinite(cardWidth) && cardWidth > 0 ? cardWidth : 160;
@@ -29,7 +30,7 @@ export function cardFace(card, style, {cardWidth = 160, pixelRatio = 1} = {}) {
 }
 
 export function resolveArt(choice, random = Math.random) {
-  return artStyles.includes(choice) ? choice : artStyles[Math.floor(random() * artStyles.length)];
+  return fixedArtChoices.includes(choice) ? choice : artStyles[Math.floor(random() * artStyles.length)];
 }
 
 export function loadArt(storage, random = Math.random) {
@@ -37,7 +38,7 @@ export function loadArt(storage, random = Math.random) {
     const saved = JSON.parse(storage.getItem('kabale-card-art'));
     if (saved?.choice === 'painted') saved.choice = 'woodcut';
     if (saved?.resolved === 'painted') saved.resolved = 'woodcut';
-    if (saved && [...artStyles, 'random'].includes(saved.choice)) {
+    if (saved && [...fixedArtChoices, 'random'].includes(saved.choice)) {
       return { choice: saved.choice, resolved: saved.choice === 'random' && artStyles.includes(saved.resolved) ? saved.resolved : resolveArt(saved.choice) };
     }
   } catch { /* Use the default when storage is unavailable or invalid. */ }
