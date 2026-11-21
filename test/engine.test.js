@@ -105,8 +105,15 @@ test('FreeCell auto move can uncover a foundation card and ignores equivalent co
   const g = deal('freecell');
   const ace = freeCard(1,'♠');
   const blocker = freeCard(9,'♥');
-  g.cols = [[ace,blocker],[freeCard(10,'♦'),freeCard(9,'♣')],[],[freeCard(10,'♥')]];
+  g.cols = [[ace,blocker],[freeCard(10,'♦'),freeCard(9,'♣')],[freeCard(5,'♣')],[freeCard(10,'♥')]];
+  g.cells = [freeCard(2,'♣'),freeCard(3,'♣'),freeCard(4,'♣'),freeCard(6,'♣')];
+  assert.equal(canMove(g,1,3,1),true);
+  const before = structuredClone(g);
   assert.equal(autoMove(g,'col:1:1'),false);
+  assert.deepEqual(g,before);
+
+  g.cols[2] = [];
+  g.cells[0] = null;
   assert.equal(autoMove(g,'col:0:1'),true);
   assert.deepEqual(g.cols[0],[ace]);
   assert.deepEqual(g.cols[2],[blocker]);
@@ -117,17 +124,58 @@ test('FreeCell auto move can uncover a foundation card and ignores equivalent co
   assert.equal(applyMove(g,'found:0','cell:0'),true);
 });
 
-test('FreeCell auto move prefers an empty column for a king that covers another card', () => {
+for (let rank = 2; rank <= 13; rank++) {
+  test(`FreeCell auto move prefers the first empty column for rank ${rank} covering another card`, () => {
+    const g = deal('freecell');
+    const jack = freeCard(11,'♣');
+    const card = freeCard(rank,'♠');
+    const club = freeCard(10,'♣');
+    g.cols = [[jack,card],[club],[],[]];
+
+    assert.equal(autoMove(g,'col:0:1'),true);
+    assert.deepEqual(g.cols,[[jack],[club],[card],[]]);
+    assert.deepEqual(g.cells,[null,null,null,null]);
+    assert.equal(autoMove(g,'col:2:0'),false);
+    assert.equal(g.moves,1);
+  });
+}
+
+test('FreeCell auto move prefers an ordinary build to empty space', () => {
   const g = deal('freecell');
-  const two = freeCard(2,'♣');
-  const king = freeCard(13,'♠');
-  g.cols = [[two,king],[],[]];
+  const jack = freeCard(11,'♦');
+  const four = freeCard(4,'♠');
+  const five = freeCard(5,'♥');
+  g.cols = [[jack,four],[],[five]];
 
   assert.equal(autoMove(g,'col:0:1'),true);
-  assert.deepEqual(g.cols,[[two],[king],[]]);
+  assert.deepEqual(g.cols,[[jack],[],[five,four]]);
   assert.deepEqual(g.cells,[null,null,null,null]);
-  assert.equal(autoMove(g,'col:1:0'),false);
+});
+
+test('FreeCell auto move prefers the ace foundation to a build or empty space', () => {
+  const g = deal('freecell');
+  const jack = freeCard(11,'♦');
+  const ace = freeCard(1,'♠');
+  const two = freeCard(2,'♥');
+  g.cols = [[jack,ace],[two],[]];
+
+  assert.equal(canMove(g,0,1,1),true);
+  assert.equal(autoMove(g,'col:0:1'),true);
+  assert.deepEqual(g.found[0],[ace]);
+  assert.deepEqual(g.cols,[[jack],[two],[]]);
+  assert.deepEqual(g.cells,[null,null,null,null]);
   assert.equal(g.moves,1);
+});
+
+test('FreeCell auto move leaves the board alone when an exposed card has no legal destination', () => {
+  const g = deal('freecell');
+  g.cols = [[freeCard(11,'♦'),freeCard(4,'♠')],[freeCard(5,'♣')]];
+  g.cells = [freeCard(13,'♣'),freeCard(2,'♣'),freeCard(3,'♣'),freeCard(7,'♣')];
+  const before = structuredClone(g);
+
+  assert.equal(legalMoves(g).some(move => move.from === 'col:0:1'),false);
+  assert.equal(autoMove(g,'col:0:1'),false);
+  assert.deepEqual(g,before);
 });
 
 test('FreeCell counts temporary columns without counting the destination', () => {

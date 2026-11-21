@@ -303,6 +303,22 @@ test('FreeCell double-click moves an exposed king to the first empty free cell',
   assert.equal(h.api.state().moves,1);
 });
 
+test('FreeCell double-click moves the four of spades to the first empty free cell',()=>{
+  const g=engine.deal('freecell');
+  const four=c(4), jack=c(11,'♦'), king=c(13,'♣');
+  g.cols=[[jack,four],[c(3)],[c(5)],[c(6)],[c(7)],[c(8)],[c(9)],[c(10)]];
+  g.cells[0]=king;
+  const h=app(g);
+
+  h.click('col:0:1');
+  h.click('col:0:1');
+
+  const state=h.api.state();
+  assert.deepEqual(Array.from(state.cols[0],card=>card.id),[jack.id]);
+  assert.deepEqual(Array.from(state.cells,card=>card?.id??null),[king.id,four.id,null,null]);
+  assert.equal(state.moves,1);
+});
+
 test('FreeCell keeps the selected stack after repeated clicks on an occupied free cell',()=>{
   const g=engine.deal('freecell');
   g.cols=[[c(7),c(6,'♥')],[c(8,'♥')],[],[],[],[],[],[]];
