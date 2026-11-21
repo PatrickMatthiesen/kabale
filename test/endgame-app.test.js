@@ -242,6 +242,12 @@ test('Pyramid reveals the hinted stock and moves a colliding toast without resiz
   table.emit('scroll',{});
   assert.equal(toast.dataset.corner,'top-right');
 
+  h.stored.set=()=>{throw new Error('Storage blocked');};
+  h.api.flush();
+  assert.match(h.get('hint-feedback-text').textContent,/storage is unavailable/i);
+  assert.equal(toast.dataset.corner,'top-right');
+  assert.match(table.innerHTML,/hint-source[^>]*data-key="stock"[^>]*>/);
+
   Object.assign(h.window,{innerWidth:1280,innerHeight:768});
   h.window.emit('resize',{});
   assert.equal(toast.dataset.corner,'bottom-right');

@@ -283,7 +283,7 @@ function hintCardBounds(card) {
 }
 function placeFeedback() {
   if (feedback.hidden) return;
-  const marked = hint && hintFeedback
+  const marked = hint
     ? Array.from(board.querySelectorAll('.hint-source, .hint-destination'),hintCardBounds)
     : [];
   if (!marked.length) {
