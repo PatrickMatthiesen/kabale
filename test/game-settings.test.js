@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadEmptyColumns, saveEmptyColumns, loadFreeCellAutoFill, saveFreeCellAutoFill, loadAutoMoveTrigger, saveAutoMoveTrigger } from '../src/game-settings.js';
+import { loadCardAnimations, saveCardAnimations } from '../src/game-settings.js';
 import { loadLanguage, saveLanguage } from '../src/i18n.js';
 
 test('empty-column preference loads saved values and defaults to King-only', () => {
@@ -51,6 +52,18 @@ test('auto-move trigger defaults to double-click and tolerates unavailable stora
   assert.equal(loadAutoMoveTrigger(storage), 'double');
   assert.equal(loadAutoMoveTrigger({ getItem() { throw new Error('blocked'); } }), 'double');
   assert.equal(saveAutoMoveTrigger({ setItem() { throw new Error('blocked'); } }, 'single'), 'single');
+});
+
+test('card animations default to on and persist an explicit opt-out', () => {
+  const values = new Map();
+  const storage = { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value) };
+  assert.equal(loadCardAnimations(storage), 'on');
+  assert.equal(saveCardAnimations(storage, 'off'), 'off');
+  assert.equal(loadCardAnimations(storage), 'off');
+  assert.equal(saveCardAnimations(storage, 'invalid'), 'on');
+  assert.equal(loadCardAnimations(storage), 'on');
+  assert.equal(loadCardAnimations({ getItem() { throw new Error('blocked'); } }), 'on');
+  assert.equal(saveCardAnimations({ setItem() { throw new Error('blocked'); } }, 'off'), 'off');
 });
 
 test('language follows the browser default until the player chooses an override',()=>{

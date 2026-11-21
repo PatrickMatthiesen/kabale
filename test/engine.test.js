@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {deal,canMove,move,draw,toCell,cellToCol,toFoundation,runValid,pyramidPlayable,applyMove,legalMoves,autoMove} from '../src/engine.js';
+import test from 'node:test';import assert from 'node:assert/strict';import {deal,canMove,move,draw,toCell,cellToCol,toFoundation,runValid,pyramidPlayable,applyMove,legalMoves,movesFrom,autoMove} from '../src/engine.js';
 test('Klondike lays 28 cards, seven exposed',()=>{const g=deal('klondike');assert.equal(g.cols.flat().length,28);assert.equal(g.cols.flat().filter(c=>c.up).length,7)});
 test('FreeCell deals all 52 face up',()=>{const g=deal('freecell');assert.equal(g.cols.flat().length,52);assert.ok(g.cols.flat().every(c=>c.up))});
 test('Spider deals 54 cards and stock of 50',()=>{const g=deal('spider');assert.equal(g.cols.flat().length,54);assert.equal(g.stock.length,50)});
@@ -122,6 +122,47 @@ test('FreeCell auto move can uncover a foundation card and ignores equivalent co
   assert.equal(autoMove(g,'found:0'),false);
   assert.equal(applyMove(g,'found:0','found:1'),false);
   assert.equal(applyMove(g,'found:0','cell:0'),true);
+});
+
+test('FreeCell auto move puts the two of spades on the lone three of diamonds and leaves it there', () => {
+  const g = deal('freecell');
+  const suits = {S:'♠',H:'♥',D:'♦',C:'♣'};
+  const cards = pile => pile.split(' ').map(([s,r]) => freeCard(' A23456789TJQK'.indexOf(r),suits[s]));
+  g.cols = [
+    'D3',
+    'D2 S8 H6 C8 C7 DT DK',
+    'D9 HQ D6 C3 D4 SQ S5',
+    'C5 DQ CK H7 S6 DA C4 H3 S2',
+    'H8 CT C2 SK',
+    'H5 H4 HJ HA SA H9',
+    'CQ HT S4 D5 S9 D7 C6',
+    'ST H2 DJ D8 SJ C9',
+  ].map(cards);
+  g.cells = cards('CJ S3 HK S7');
+  g.found[3] = cards('CA');
+
+  assert.deepEqual(movesFrom(g,'col:3:8').map(move => move.to),['col:0']);
+  assert.equal(autoMove(g,'col:3:8'),true);
+  assert.deepEqual(g.cols[0],cards('D3 S2'));
+  assert.deepEqual(g.cols[3].at(-1),freeCard(3,'♥'));
+  assert.equal(g.moves,1);
+
+  const after = structuredClone(g);
+  assert.deepEqual(movesFrom(g,'col:0:1').map(move => move.to),['col:3']);
+  assert.equal(autoMove(g,'col:0:1'),false);
+  assert.deepEqual(g,after);
+});
+
+test('FreeCell auto move keeps a foundation-ready equivalent destination exposed', () => {
+  const g = deal('freecell');
+  g.cols = [[freeCard(9,'♣'),freeCard(3,'♥'),freeCard(2,'♠')],[freeCard(3,'♦')]];
+  g.cells = [freeCard(11,'♣'),freeCard(3,'♠'),freeCard(13,'♥'),freeCard(7,'♠')];
+  g.found[2] = [freeCard(1,'♦'),freeCard(2,'♦')];
+  const before = structuredClone(g);
+
+  assert.deepEqual(movesFrom(g,'col:0:2').map(move => move.to),['col:1']);
+  assert.equal(autoMove(g,'col:0:2'),false);
+  assert.deepEqual(g,before);
 });
 
 for (let rank = 2; rank <= 13; rank++) {

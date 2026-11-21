@@ -90,15 +90,22 @@ function autoMoveFreeCell(g, key, source, cascadeFoundations) {
   const canUseEmptySpace = uncoversFoundationCard ||
     (source.t === 'col' && source.i > 0 && source.c.length === 1);
   const targetColumn = ({to}) => to.startsWith('col:') ? g.cols[parts(to)[1]] : undefined;
+  const hasEquivalentParent = top => parent && top.r === parent.r && red(top) === red(parent);
   const buildsOnColumn = move => {
     const top = targetColumn(move)?.at(-1);
-    return top && !foundationReady(top) &&
-      (uncoversFoundationCard || !parent || top.r !== parent.r || red(top) !== red(parent));
+    return top && !foundationReady(top) && (uncoversFoundationCard || !hasEquivalentParent(top));
+  };
+  const balancesColumns = move => {
+    const column = targetColumn(move);
+    const top = column?.at(-1);
+    // An equivalent build must leave more cards behind than the destination started with.
+    return top && source.i > column.length && hasEquivalentParent(top) && !foundationReady(top);
   };
   const move = moves.find(move => move.to.startsWith('found:'))
     ?? moves.find(buildsOnColumn)
     ?? ((source.t === 'cell' || canUseEmptySpace) ? moves.find(move => targetColumn(move)?.length === 0) : null)
-    ?? (canUseEmptySpace ? moves.find(move => move.to.startsWith('cell:')) : null);
+    ?? (canUseEmptySpace ? moves.find(move => move.to.startsWith('cell:')) : null)
+    ?? (source.t === 'col' ? moves.find(balancesColumns) : null);
   if (!move || !applyMove(g, key, move.to)) return false;
   if (cascadeFoundations && move.to.startsWith('found:')) cascadeFreeCellFoundations(g);
   return true;

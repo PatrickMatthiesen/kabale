@@ -5,9 +5,10 @@ function cleanClone(card) {
   const clone = card.cloneNode(true);
   clone.removeAttribute('id');
   clone.removeAttribute('data-key');
+  clone.removeAttribute('data-motion-key');
   clone.removeAttribute('aria-label');
   clone.removeAttribute('aria-pressed');
-  clone.classList.remove('selected','hinted','hint-source','hint-destination','drag-source');
+  clone.classList.remove('selected','hinted','hint-source','hint-destination','drag-source','drop-target','drop-hover');
   clone.setAttribute('aria-hidden', 'true');
   clone.inert = true;
   if ('disabled' in clone) clone.disabled = true;
@@ -38,18 +39,33 @@ function snapshotCards(board, { limit = Infinity } = {}) {
   const selected = cards.length > limit
     ? Array.from({ length: limit }, (_, index) => cards[Math.floor(index * stride)])
     : cards;
-  return selected.map(card => {
-    const rect = card.getBoundingClientRect();
-    return {
-      node: cleanClone(card),
-      left: rect.left,
-      top: rect.top,
-      width: rect.width,
-      height: rect.height,
-      centerX: rect.left + rect.width / 2,
-      centerY: rect.top + rect.height / 2,
-    };
-  });
+  return selected.map(card => ({ node: cleanClone(card), ...geometry(card) }));
+}
+
+function geometry(element) {
+  const { left, top, width, height } = element.getBoundingClientRect();
+  return { left, top, width, height, centerX: left + width / 2, centerY: top + height / 2 };
+}
+
+function intersects(rect, bounds) {
+  return rect && rect.width > 0 && rect.height > 0 &&
+    rect.left < bounds.left + bounds.width && rect.left + rect.width > bounds.left &&
+    rect.top < bounds.top + bounds.height && rect.top + rect.height > bounds.top;
+}
+
+function transferTargets(board) {
+  const targets = new Map();
+  for (const element of board.querySelectorAll('[data-key], .run-counter')) {
+    if (element.closest('[aria-hidden="true"], .waste-ghost')) continue;
+    const key = element.dataset.key ?? 'runs';
+    const card = element.matches('.card[data-key]');
+    if (card || !targets.has(key)) targets.set(key, { element, card });
+  }
+  for (const element of board.querySelectorAll('.waste-ghost .card[data-motion-key]:disabled')) {
+    const key = element.dataset.motionKey;
+    if (!targets.has(key)) targets.set(key, { element, card: true });
+  }
+  return targets;
 }
 
 function random(min, max) {
@@ -60,7 +76,7 @@ function random(min, max) {
  * Creates short, decorative card animations that never participate in play.
  * Call cancel() before changing the board for any action other than a deal.
  */
-export function createCardMotion(board) {
+export function createCardMotion(board, { isEnabled = () => true } = {}) {
   if (!board) throw new TypeError('createCardMotion requires the game board element');
 
   const doc = board.ownerDocument;
@@ -69,15 +85,28 @@ export function createCardMotion(board) {
   let overlay = null;
   let job = null;
   let lastCelebration = -1;
-  let hidden = [];
+  const hidden = new Map();
 
-  const enabled = () => !reduceMotion?.matches && typeof board.animate === 'function';
+  const enabled = () => isEnabled() && !reduceMotion?.matches && typeof board.animate === 'function';
+
+  function hideCard(element) {
+    if (hidden.has(element)) return;
+    hidden.set(element, {
+      opacity: element.style.opacity,
+      priority: element.style.getPropertyPriority('opacity'),
+    });
+    element.style.opacity = '0';
+  }
+
+  function restoreCard(element) {
+    if (!hidden.has(element)) return;
+    const { opacity, priority } = hidden.get(element);
+    element.style.setProperty('opacity', opacity, priority);
+    hidden.delete(element);
+  }
 
   function restoreCards() {
-    for (const { element, opacity } of hidden) {
-      if (element.isConnected) element.style.opacity = opacity;
-    }
-    hidden = [];
+    for (const element of hidden.keys()) restoreCard(element);
   }
 
   function removeOverlay() {
@@ -88,12 +117,16 @@ export function createCardMotion(board) {
 
   function cancel() {
     const current = job;
-    job = null;
     if (current) {
       for (const animation of current.animations) animation.cancel();
       current.finish();
+    } else {
+      removeOverlay();
     }
-    removeOverlay();
+  }
+
+  function cancelTransfer() {
+    if (job?.transfer) cancel();
   }
 
   function capture() {
@@ -101,37 +134,47 @@ export function createCardMotion(board) {
     return { cards: snapshotCards(board) };
   }
 
-  function makeOverlay() {
+  function makeOverlay(bounds) {
     const element = doc.createElement('div');
     element.className = 'card-motion-overlay';
     element.setAttribute('aria-hidden', 'true');
     element.inert = true;
+    if (bounds) {
+      Object.assign(element.style, {
+        inset: 'auto',
+        left: `${bounds.left}px`,
+        top: `${bounds.top}px`,
+        width: `${bounds.width}px`,
+        height: `${bounds.height}px`,
+      });
+    }
     (doc.body || doc.documentElement).append(element);
     overlay = element;
     return element;
   }
 
-  function addCards(overlayElement, records) {
-    return records.map(record => {
-      const wrapper = doc.createElement('div');
-      wrapper.className = 'card-motion-item';
-      wrapper.style.left = `${record.left}px`;
-      wrapper.style.top = `${record.top}px`;
-      wrapper.style.width = `${record.width}px`;
-      wrapper.style.height = `${record.height}px`;
-      wrapper.style.setProperty('--card-w',`${record.width}px`);
-      wrapper.append(record.node.cloneNode(true));
-      overlayElement.append(wrapper);
-      return { wrapper, ...record };
-    });
+  function addCard(layer, { node, left, top, width, height }, bounds) {
+    const wrapper = doc.createElement('div');
+    wrapper.className = 'card-motion-item';
+    wrapper.style.left = `${left - (bounds?.left ?? 0)}px`;
+    wrapper.style.top = `${top - (bounds?.top ?? 0)}px`;
+    wrapper.style.width = `${width}px`;
+    wrapper.style.height = `${height}px`;
+    wrapper.style.setProperty('--card-w', `${width}px`);
+    wrapper.append(node.cloneNode(true));
+    layer.append(wrapper);
+    return wrapper;
+  }
+
+  function addCards(layer, records) {
+    return records.map(record => ({ wrapper: addCard(layer, record), ...record }));
   }
 
   function hideCurrentCards() {
-    hidden = visibleCards(board).map(element => ({ element, opacity: element.style.opacity }));
-    for (const { element } of hidden) element.style.opacity = '0';
+    for (const element of visibleCards(board)) hideCard(element);
   }
 
-  function run(animations) {
+  function run(animations, transfer = false) {
     if (!animations.length) {
       removeOverlay();
       return Promise.resolve();
@@ -140,11 +183,14 @@ export function createCardMotion(board) {
       let settled = false;
       const current = {
         animations,
+        transfer,
         finish: () => {
           if (settled) return;
           settled = true;
-          if (job === current) job = null;
-          removeOverlay();
+          if (job === current) {
+            job = null;
+            removeOverlay();
+          }
           resolve();
         },
       };
@@ -160,6 +206,106 @@ export function createCardMotion(board) {
     } catch {
       return null;
     }
+  }
+
+  function transferBounds() {
+    const { left, top } = board.getBoundingClientRect();
+    const x = left + board.clientLeft;
+    const y = top + board.clientTop;
+    const right = Math.min(x + board.clientWidth, view?.innerWidth ?? Infinity);
+    const bottom = Math.min(y + board.clientHeight, view?.innerHeight ?? Infinity);
+    return {
+      left: Math.max(0, x),
+      top: Math.max(0, y),
+      width: Math.max(0, right - Math.max(0, x)),
+      height: Math.max(0, bottom - Math.max(0, y)),
+    };
+  }
+
+  // Snapshot the old DOM before the next render replaces it.
+  function captureTransfers(transfers) {
+    cancelTransfer();
+    if (!enabled() || !transfers?.length) return [];
+    const targets = transferTargets(board);
+    const bounds = transferBounds();
+    const sources = new Map();
+    return transfers.map(({ from, to, arrives, fromAnchor }) => {
+      if (!sources.has(from)) {
+        const target = targets.get(from);
+        const rect = target && geometry(target.element);
+        sources.set(from, rect?.width > 0 && rect.height > 0 ? {
+          ...rect,
+          visible: intersects(rect, bounds),
+          node: target.card ? cleanClone(target.element) : null,
+        } : null);
+      }
+      const source = sources.get(from);
+      return { source: fromAnchor && source ? { ...source, node: null } : source, to, arrives };
+    });
+  }
+
+  function move(records, { duration } = {}) {
+    cancelTransfer();
+    if (job || !enabled() || !records?.length) return Promise.resolve();
+
+    const targets = transferTargets(board);
+    const bounds = transferBounds();
+    if (!bounds.width || !bounds.height) return Promise.resolve();
+    const prepared = [];
+    const arrivals = new Set();
+    for (const { source, to, arrives } of records) {
+      const target = targets.get(to);
+      const end = target && geometry(target.element);
+      const destination = arrives && target?.card ? target.element : null;
+      const visibleEnd = intersects(end, bounds);
+      const origin = source?.visible ? source : null;
+      if (!origin && !(destination && visibleEnd)) continue;
+      if (destination && arrivals.has(destination)) continue;
+
+      const start = origin?.node ? origin : end;
+      const node = source?.node ?? (destination && cleanClone(destination));
+      if (!node || !start) continue;
+      if (destination) arrivals.add(destination);
+
+      // A placeholder or run counter supplies a position but no card image.
+      const frame = (rect, scaleX, scaleY = scaleX) =>
+        `translate3d(${rect.centerX - start.centerX}px,${rect.centerY - start.centerY}px,0) scale(${scaleX},${scaleY})`;
+      const first = { transform: frame(origin ?? start, origin?.node ? 1 : .78), opacity: origin ? 1 : 0 };
+      const last = end?.width && end.height ? {
+        transform: destination
+          ? frame(end, end.width / start.width, end.height / start.height)
+          : frame(end, .65),
+        opacity: destination ? 1 : 0,
+      } : { transform: 'translate3d(0,-12px,0) scale(.92)', opacity: 0 };
+      prepared.push({ start, node, destination: visibleEnd ? destination : null, frames: [first, last], duration: origin && visibleEnd ? 190 : 150 });
+    }
+    if (!prepared.length) return Promise.resolve();
+
+    const layer = makeOverlay(bounds);
+    const animations = [];
+    prepared.forEach(({ start, node, destination, frames, duration: defaultDuration }, index) => {
+      const wrapper = addCard(layer, { ...start, node }, bounds);
+      const delay = Math.min(index * 9, 40, duration === undefined ? Infinity : duration / 4);
+      const animation = animate(wrapper, frames, {
+        duration: duration === undefined ? defaultDuration : duration - delay,
+        delay,
+        easing: 'cubic-bezier(.2,.72,.22,1)',
+      });
+      if (!animation) {
+        wrapper.remove();
+        return;
+      }
+      if (destination) hideCard(destination);
+      animations.push(animation);
+      const cleanup = () => {
+        if (overlay !== layer) return;
+        wrapper.remove();
+        if (destination) restoreCard(destination);
+      };
+      // Release the real card on landing while the rest of the batch continues.
+      animation.finished.then(cleanup, cleanup);
+    });
+    return run(animations, true);
   }
 
   function deal(previous) {
@@ -298,8 +444,7 @@ export function createCardMotion(board) {
     wrapper.style.setProperty('--card-w',`${sourceRect.width}px`);
     wrapper.append(cleanClone(fromElement));
     layer.append(wrapper);
-    hidden = [{element:fromElement,opacity:fromElement.style.opacity}];
-    fromElement.style.opacity = '0';
+    hideCard(fromElement);
     const dx = targetRect.left + targetRect.width / 2 - sourceRect.left - sourceRect.width / 2;
     const dy = targetRect.top + targetRect.height / 2 - sourceRect.top - sourceRect.height / 2;
     const scaleX = targetRect.width / sourceRect.width;
@@ -319,6 +464,9 @@ export function createCardMotion(board) {
   return {
     enabled,
     capture,
+    captureTransfers,
+    move,
+    cancelTransfer,
     deal,
     win,
     cancel,
