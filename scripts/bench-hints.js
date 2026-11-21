@@ -25,7 +25,9 @@ export function seededDeal(mode, difficulty, seed) {
 }
 
 // Play the supplied game in place, one Help recommendation at a time.
-export function replayHints(game, maxMoves = defaultMoveCap) {
+export function replayHints(game, maxMoves = defaultMoveCap, options = {}) {
+  // An explicit undefined budget lets selectHelpHint use its production default.
+  const hintOptions = {maxTimeMs: Infinity, ...options};
   rememberStock(game);
   const initial = hintVisitKey(game);
   const replayKey = position => JSON.stringify([position, game.stockMemory]);
@@ -35,16 +37,18 @@ export function replayHints(game, maxMoves = defaultMoveCap) {
   const hintMs = [];
   let stockExplorations = 0;
   let stockKnowledgeRevisits = 0;
+  let planReason;
   const finish = (outcome, details = {}) => ({
-    outcome, moves: game.moves - startingMoves, hintMs, stockExplorations, stockKnowledgeRevisits, ...details
+    outcome, moves: game.moves - startingMoves, hintMs, stockExplorations, stockKnowledgeRevisits,
+    ...(planReason === undefined ? {} : {planReason}), ...details
   });
 
   if (game.won) return finish('win');
   for (let turn = 0; turn < maxMoves; turn++) {
     const start = performance.now();
-    // Keep Klondike's production node and depth limits without a wall-clock cutoff.
-    const {move, plan} = selectHelpHint(game, visited, {maxTimeMs: Infinity});
+    const {move, plan} = selectHelpHint(game, visited, hintOptions);
     hintMs.push(performance.now() - start);
+    planReason = plan?.reason;
 
     const legal = legalMoves(game);
     if (!move) return finish(legal.length ? 'stalled' : 'dead-end');
@@ -63,7 +67,7 @@ export function replayHints(game, maxMoves = defaultMoveCap) {
     const position = hintVisitKey(game);
     const withKnowledge = replayKey(position);
     // Klondike can pass through an earlier stock split after learning more card faces.
-    if (visitedWithKnowledge.has(withKnowledge)) return finish('repeat', {move, planReason: plan?.reason});
+    if (visitedWithKnowledge.has(withKnowledge)) return finish('repeat', {move, planReason});
     if (visited.has(position)) stockKnowledgeRevisits++;
     visited.add(position);
     visitedWithKnowledge.add(withKnowledge);
@@ -77,18 +81,24 @@ function percentile(sorted, fraction) {
 
 function main() {
   const { values } = parseArgs({ options: {
+    mode: { type: 'string' },
     difficulty: { type: 'string', default: 'normal' },
     deals: { type: 'string', default: '32' },
     seed: { type: 'string', default: '1' },
     'max-moves': { type: 'string', default: String(defaultMoveCap) },
+    timed: { type: 'boolean' },
     help: { type: 'boolean' }
   } });
   if (values.help) {
-    console.log('bun scripts/bench-hints.js [--difficulty normal|easy] [--deals 32] [--seed 1] [--max-moves 240]');
+    console.log(`bun scripts/bench-hints.js [--mode ${modes.join('|')}] [--difficulty normal|easy] [--deals 32] [--seed 1] [--max-moves 240] [--timed]`);
     console.log('Stalled means Help found no hint but legal moves remain. A repeat includes the stock knowledge.');
+    console.log('--timed uses the production time budget. The default has no elapsed-time cutoff.');
     return;
   }
-  const { difficulty } = values;
+  const { difficulty, mode, timed } = values;
+  if (mode !== undefined && !modes.includes(mode)) {
+    throw new Error(`Choose one of ${modes.join(', ')}.`);
+  }
   const [deals, seed, maxMoves] = [values.deals, values.seed, values['max-moves']].map(Number);
   if (![deals, seed, maxMoves].every(Number.isSafeInteger) || deals < 1 || maxMoves < 1 || seed < 0 ||
       seed + deals - 1 > 0xffffffff || !['normal', 'easy'].includes(difficulty)) {
@@ -96,9 +106,11 @@ function main() {
   }
 
   console.log(`${difficulty}, ${deals} deals per game, seeds ${seed} to ${seed + deals - 1}, ${maxMoves} moves per deal`);
-  console.log('Klondike uses the production node and depth limits with no elapsed-time cutoff.');
+  console.log(timed ? 'Using the production time budget.' : 'Using production search limits with no elapsed-time cutoff.');
+  const hintOptions = timed ? {maxTimeMs: undefined} : undefined;
   const examples = [];
-  const rows = modes.map(mode => {
+  const terminalReasons = new Map();
+  const rows = (mode === undefined ? modes : [mode]).map(mode => {
     const row = {
       mode, win: 0, stalled: 0, 'dead-end': 0, repeat: 0, 'invalid-hint': 0, 'move-cap': 0,
       'stock explorations': 0, 'revisits with new knowledge': 0
@@ -106,10 +118,16 @@ function main() {
     const hintMs = [];
     for (let index = 0; index < deals; index++) {
       const dealSeed = seed + index;
-      const result = replayHints(seededDeal(mode, difficulty, dealSeed), maxMoves);
+      const result = replayHints(seededDeal(mode, difficulty, dealSeed), maxMoves, hintOptions);
       const { outcome, moves, move, planReason, stockExplorations, stockKnowledgeRevisits } = result;
       if ((outcome === 'repeat' || outcome === 'invalid-hint') && row[outcome] === 0) {
         examples.push({ mode, seed: dealSeed, outcome, moves, move, planReason });
+      }
+      if (planReason !== undefined) {
+        const key = JSON.stringify([mode, outcome, planReason]);
+        const terminal = terminalReasons.get(key) ?? { mode, outcome, reason: planReason, count: 0 };
+        terminal.count++;
+        terminalReasons.set(key, terminal);
       }
       row[outcome]++;
       row['stock explorations'] += stockExplorations;
@@ -117,11 +135,18 @@ function main() {
       for (const duration of result.hintMs) hintMs.push(duration);
     }
     hintMs.sort((a, b) => a - b);
-    return { ...row, 'median hint ms': percentile(hintMs, 0.5), 'p95 hint ms': percentile(hintMs, 0.95) };
+    return {
+      ...row, 'median hint ms': percentile(hintMs, 0.5), 'p95 hint ms': percentile(hintMs, 0.95),
+      'max hint ms': percentile(hintMs, 1)
+    };
   });
   console.table(rows);
+  if (terminalReasons.size) {
+    console.log('Planner reasons on the last hint call of each deal.');
+    console.table([...terminalReasons.values()]);
+  }
   for (const example of examples) console.log(example);
-  if (rows.some(row => row['invalid-hint'])) process.exitCode = 1;
+  if (rows.some(row => row.repeat || row['invalid-hint'])) process.exitCode = 1;
 }
 
 if (import.meta.main) main();

@@ -1015,6 +1015,48 @@ test('the same single-click preference works in Spider and Pyramid',()=>{
   assert.equal(pyramidApp.api.state().moves,1);
 });
 
+function pyramidWithTwoPartners() {
+  const g=engine.deal('pyramid');
+  g.cols=g.cols.map(row=>row.map(()=>null));
+  g.cols[5][1]=c(4,'♣');
+  g.cols[6].splice(0,3,c(9),c(4,'♥'),c(9,'♦'));
+  g.stock=[];
+  g.redealsLeft=0;
+  return g;
+}
+
+for (const shortcut of ['single-click', 'double-click', 'A key']) {
+  test(`Pyramid ${shortcut} plays the pair that Help highlights`,()=>{
+    const h=app(pyramidWithTwoPartners());
+    if (shortcut==='single-click') setAutoMoveTrigger(h);
+    h.get('hint').onclick();
+    assert.match(h.get('board').innerHTML,/class="[^"]*hint-source"[^>]*data-key="p:6:1"/);
+    assert.match(h.get('board').innerHTML,/class="[^"]*hint-destination"[^>]*data-key="p:6:2"/);
+    h.click('p:6:1');
+    if (shortcut!=='single-click') assert.equal(h.api.state().moves,0);
+    if (shortcut==='double-click') h.click('p:6:1');
+    if (shortcut==='A key') {
+      h.document.emit('keydown',{key:'a',target:{tagName:'BUTTON'},preventDefault(){}});
+    }
+    assert.equal(h.api.state().cols[6][0]?.id,c(9).id);
+    assert.equal(h.api.state().cols[6][2],null);
+    h.click('p:5:1');
+    if (shortcut!=='single-click') h.click('p:6:0');
+    assert.equal(h.api.state().won,true);
+  });
+}
+
+test('Pyramid lets the player choose a different legal partner after Help',()=>{
+  const h=app(pyramidWithTwoPartners());
+  h.get('hint').onclick();
+  h.click('p:6:1');
+  assert.equal(h.api.state().moves,0);
+  h.click('p:6:0');
+  assert.equal(h.api.state().moves,1);
+  assert.equal(h.api.state().cols[6][0],null);
+  assert.equal(h.api.state().cols[6][2].id,c(9,'♦').id);
+});
+
 test('the auto-fill setting is visible only for FreeCell',()=>{
   const h=app(freeCellBeforeWin()),options=h.get('freecell-options');
   assert.equal(options.hidden,false);
@@ -1181,12 +1223,12 @@ test('FreeCell can lift the four-card king run with another empty column',()=>{
 
 test('FreeCell hints name both face-up cards and mark the right handles',()=>{
   const g=engine.deal('freecell');
-  g.cols=[[c(9,'♦'),c(7,'♣')],[c(8,'♥')],[],[],[],[],[],[]];
+  g.cols=[[c(1,'♦'),c(7,'♣')],[c(13,'♠'),c(8,'♥')],[],[],[],[],[],[]];
   const single=app(g);
   single.get('hint').onclick();
   assert.equal(single.get('hint-feedback-text').textContent,'Move 7♣\uFE0E of clubs onto 8♥\uFE0E of hearts.');
   assert.match(single.get('board').innerHTML,/class="[^"]*hint-source"[^>]*data-key="col:0:1"/);
-  assert.match(single.get('board').innerHTML,/class="[^"]*hint-destination"[^>]*data-key="col:1:0"/);
+  assert.match(single.get('board').innerHTML,/class="[^"]*hint-destination"[^>]*data-key="col:1:1"/);
   assert.match(single.get('board').innerHTML,/data-key="cell:1" aria-label="Free cell 2"/);
   single.get('hint-feedback-close').onclick();
   assert.doesNotMatch(single.get('board').innerHTML,/hint-source|hint-destination/);
@@ -1226,7 +1268,7 @@ test('rank and suit size is saved independently of the deal and deck',()=>{
 
 test('Danish persists, translates live hints and leaves the current deal in place',()=>{
   const g=engine.deal('freecell');
-  g.cols=[[c(9,'♦'),c(7,'♣')],[c(8,'♥')],[],[],[],[],[],[]];
+  g.cols=[[c(1,'♦'),c(7,'♣')],[c(13,'♠'),c(8,'♥')],[],[],[],[],[],[]];
   g.moves=14;
   const h=app(g);
   const original=h.api.state();
