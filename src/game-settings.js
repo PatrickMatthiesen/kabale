@@ -1,5 +1,7 @@
 const EMPTY_COLUMNS_KEY = 'kabale-empty-columns';
 const CARD_INDEX_SIZE_KEY = 'kabale-card-index-size';
+const FREECELL_AUTO_FILL_KEY = 'kabale-freecell-auto-fill-foundations';
+const AUTO_MOVE_TRIGGER_KEY = 'kabale-auto-move-trigger';
 
 export const cardIndexScales = { small: .8, standard: 1, large: 1.25 };
 
@@ -37,4 +39,30 @@ export function saveEmptyColumns(storage, value) {
     // Storage may be unavailable or blocked by the browser.
   }
   return normalized;
+}
+
+export function loadFreeCellAutoFill(storage) {
+  try {
+    if (storage?.getItem(FREECELL_AUTO_FILL_KEY) === 'off') return 'off';
+  } catch { /* Use the default when storage is unavailable. */ }
+  return 'on';
+}
+
+export function saveFreeCellAutoFill(storage, value) {
+  const preference = value === 'off' ? 'off' : 'on';
+  try { storage?.setItem(FREECELL_AUTO_FILL_KEY, preference); } catch { /* Apply it for the current tab. */ }
+  return preference;
+}
+
+export function loadAutoMoveTrigger(storage) {
+  try {
+    if (storage?.getItem(AUTO_MOVE_TRIGGER_KEY) === 'single') return 'single';
+  } catch { /* Use the default when storage is unavailable. */ }
+  return 'double';
+}
+
+export function saveAutoMoveTrigger(storage, value) {
+  const preference = value === 'single' ? 'single' : 'double';
+  try { storage?.setItem(AUTO_MOVE_TRIGGER_KEY, preference); } catch { /* Apply it for the current tab. */ }
+  return preference;
 }

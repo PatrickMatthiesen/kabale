@@ -167,6 +167,90 @@ test('FreeCell auto move prefers the ace foundation to a build or empty space', 
   assert.equal(g.moves,1);
 });
 
+test('FreeCell cascades across tableau columns, free cells and suits until blocked', () => {
+  const g = deal('freecell');
+  const spades = [1,2,3].map(r => freeCard(r,'♠'));
+  const hearts = [1,2].map(r => freeCard(r,'♥'));
+  const clubAce = freeCard(1,'♣');
+  const blockedColumn = [freeCard(2,'♣'),freeCard(5,'♠')];
+  g.cols = [[spades[2],hearts[0]],[spades[1]],blockedColumn.slice(),[clubAce]];
+  g.cells = [spades[0],hearts[1],null,null];
+
+  assert.equal(autoMove(g,'col:3:0',{cascadeFoundations:true}),true);
+  assert.deepEqual(g.found,[[clubAce],hearts,spades,[]]);
+  assert.deepEqual(g.cols,[[],[],blockedColumn,[]]);
+  assert.deepEqual(g.cells,[null,null,null,null]);
+  assert.equal(g.moves,6);
+  assert.equal(g.won,false);
+});
+
+test('FreeCell moves one card to a foundation with the default, disabled, or manual move', () => {
+  for (const moveAce of [
+    g => autoMove(g,'col:0'),
+    g => autoMove(g,'col:0',{cascadeFoundations:false}),
+    g => applyMove(g,'col:0','found:0')
+  ]) {
+    const g = deal('freecell');
+    const ace = freeCard(1,'♠');
+    const two = freeCard(2,'♠');
+    const heartAce = freeCard(1,'♥');
+    g.cols = [[two,ace]];
+    g.cells[0] = heartAce;
+
+    assert.equal(moveAce(g),true);
+    assert.deepEqual(g.found,[[ace],[],[],[]]);
+    assert.deepEqual(g.cols,[[two]]);
+    assert.equal(g.cells[0],heartAce);
+    assert.equal(g.moves,1);
+  }
+});
+
+test('FreeCell cascade option preserves failed auto moves and tableau auto moves', () => {
+  const g = deal('freecell');
+  const ace = freeCard(1,'♠');
+  const blocker = freeCard(7,'♥');
+  g.cols = [[ace,blocker],[]];
+  g.cells[0] = freeCard(1,'♥');
+  const before = structuredClone(g);
+  const options = {cascadeFoundations:true};
+
+  assert.equal(autoMove(g,'col:1',options),false);
+  assert.deepEqual(g,before);
+  assert.equal(autoMove(g,'col:0:1',options),true);
+  assert.deepEqual(g.cols,[[ace],[blocker]]);
+  assert.deepEqual(g.cells,before.cells);
+  assert.deepEqual(g.found,before.found);
+  assert.equal(g.moves,1);
+});
+
+test('FreeCell cascade sets the win when the last card reaches a foundation', () => {
+  const g = deal('freecell');
+  const spadeKing = freeCard(13,'♠');
+  const heartKing = freeCard(13,'♥');
+  g.found = ['♠','♥','♦','♣'].map((s,i) =>
+    Array.from({length:i < 2 ? 12 : 13},(_,r) => freeCard(r+1,s)));
+  g.cols = [[spadeKing]];
+  g.cells[0] = heartKing;
+
+  assert.equal(autoMove(g,'cell:0',{cascadeFoundations:true}),true);
+  assert.equal(g.found[0].at(-1),spadeKing);
+  assert.equal(g.found[1].at(-1),heartKing);
+  assert.equal(g.moves,2);
+  assert.equal(g.won,true);
+});
+
+test('Klondike moves one card with the FreeCell cascade option enabled', () => {
+  const g = deal('klondike');
+  const ace = freeCard(1,'♠');
+  const two = freeCard(2,'♠');
+  g.cols = [[two,ace]];
+
+  assert.equal(autoMove(g,'col:0',{cascadeFoundations:true}),true);
+  assert.deepEqual(g.found,[[ace],[],[],[]]);
+  assert.deepEqual(g.cols,[[two]]);
+  assert.equal(g.moves,1);
+});
+
 test('FreeCell auto move leaves the board alone when an exposed card has no legal destination', () => {
   const g = deal('freecell');
   g.cols = [[freeCard(11,'♦'),freeCard(4,'♠')],[freeCard(5,'♣')]];

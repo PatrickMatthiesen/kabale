@@ -7,6 +7,7 @@ import { rememberStock, restoreStockMemory } from './stock-memory.js';
 import { boardLayout } from './board-layout.js';
 import { attachCardDrag } from './card-drag.js';
 import { loadEmptyColumns, saveEmptyColumns, cardIndexScales, loadCardIndexSize, saveCardIndexSize } from './game-settings.js';
+import { loadFreeCellAutoFill, saveFreeCellAutoFill, loadAutoMoveTrigger, saveAutoMoveTrigger } from './game-settings.js';
 import { gameRules } from './game-rules.js';
 import { attachEndgameUI } from './endgame-ui.js';
 import { createCardMotion } from './card-motion.js';
@@ -19,6 +20,8 @@ const art = loadArt(storage);
 saveArt(storage,art);
 let emptyColumns = loadEmptyColumns(storage);
 let indexSize = loadCardIndexSize(storage);
+let freeCellAutoFill = loadFreeCellAutoFill(storage);
+let autoMoveTrigger = loadAutoMoveTrigger(storage);
 let language = loadLanguage(storage,window.navigator?.language);
 const tr = (text,values) => translate(language,text,values);
 const setDocumentLanguage = document.documentElement ? bindDocumentLanguage(document) : null;
@@ -248,6 +251,9 @@ function render(newWin = false) {
   $('game-room').dataset.difficulty = g.difficulty;
   $('empty-columns').value = g.mode === 'klondike' ? (g.emptyColumns ?? 'kings') : emptyColumns;
   $('klondike-options').hidden = g.mode !== 'klondike';
+  $('freecell-options').hidden = g.mode !== 'freecell';
+  $('freecell-auto-fill-foundations').value = freeCellAutoFill;
+  $('auto-move-trigger').value = autoMoveTrigger;
   $('moves').textContent = g.moves;
   $('undo').disabled = g.difficulty === 'hard' || !past.length;
   $('redo').disabled = g.difficulty === 'hard' || !future.length;
@@ -424,7 +430,7 @@ function action(fn, {finishPlan, quiet} = {}) {
   } else render();
   return true;
 }
-function choose(key, automatic = false) {
+function choose(key, {autoTrigger, cascadeFoundations = false} = {}) {
   if (g.won) return;
   hintFeedback='';
   hint = null;
@@ -432,18 +438,24 @@ function choose(key, automatic = false) {
   const attempt = fn => action(fn,{quiet:true});
   if (key === 'stock') {
     if (attempt(() => applyMove(g,'stock','stock'))) return;
-  } else if (g.mode === 'freecell' && selected && key !== selected && key?.startsWith('cell:')) {
-    if (attempt(() => applyMove(g,selected,key))) return;
-    lastClick = {key:'',time:0};
-  } else if (automatic) {
-    if (attempt(() => autoMove(g,key))) return;
-  } else if (g.mode === 'pyramid' && legalMoves(g).some(m => m.from === key && m.to === key)) {
-    if (attempt(() => applyMove(g,key,key))) return;
-  } else if (key === selected) {
-    selected = null;
   } else {
-    if (selected && attempt(() => applyMove(g,selected,key))) return;
-    if (legalMoves(g).some(m => m.from === key)) selected = key;
+    const singleClick = autoTrigger === 'single';
+    const freeCellTarget = g.mode === 'freecell' && key?.startsWith('cell:');
+    const manualFirst = selected && key !== selected && (singleClick || freeCellTarget);
+    if (manualFirst && attempt(() => applyMove(g,selected,key))) return;
+    if (manualFirst && freeCellTarget) {
+      lastClick = {key:'',time:0};
+    } else if (autoTrigger && attempt(() => autoMove(g,key,{cascadeFoundations}))) {
+      return;
+    } else if (!autoTrigger && g.mode === 'pyramid' && legalMoves(g).some(m => m.from === key && m.to === key)) {
+      if (attempt(() => applyMove(g,key,key))) return;
+    } else if (!autoTrigger || singleClick) {
+      if (key === selected) selected = null;
+      else {
+        if (selected && !manualFirst && attempt(() => applyMove(g,selected,key))) return;
+        if (legalMoves(g).some(m => m.from === key)) selected = key;
+      }
+    }
   }
   render();
 }
@@ -451,9 +463,11 @@ board.addEventListener('click', e => {
   const target = e.target.closest('[data-key]');
   if (!target || target.disabled) return;
   const key = target.dataset.key, time = performance.now();
-  const automatic = e.detail !== 0 && key !== 'stock' && key === lastClick.key && time-lastClick.time < 400;
-  lastClick = automatic ? {key:'',time:0} : {key,time};
-  choose(key,automatic);
+  const pointerCard = e.detail > 0 && key !== 'stock' && target.matches('.card');
+  const doubleClick = key === lastClick.key && time-lastClick.time < 400;
+  const autoTrigger = pointerCard && (autoMoveTrigger === 'single' || doubleClick) ? autoMoveTrigger : undefined;
+  lastClick = pointerCard && autoMoveTrigger === 'double' && !autoTrigger ? {key,time} : {key:'',time:0};
+  choose(key,{autoTrigger,cascadeFoundations:g.mode === 'freecell' && freeCellAutoFill === 'on'});
 });
 board.addEventListener('keydown', e => {
   if (e.target.tagName === 'BUTTON') return;
@@ -509,6 +523,13 @@ $('modes').onclick = e => { const mode=e.target.dataset.mode; if(mode && mode !=
 $('difficulty').onchange = e => { if(!fresh(g.mode,e.target.value)) e.target.value=g.difficulty; };
 $('empty-columns').onchange = e => {
   if (!fresh(g.mode,g.difficulty,false,e.target.value)) e.target.value=g.emptyColumns ?? 'kings';
+};
+$('freecell-auto-fill-foundations').onchange = e => {
+  freeCellAutoFill = saveFreeCellAutoFill(storage,e.target.value);
+};
+$('auto-move-trigger').onchange = e => {
+  autoMoveTrigger = saveAutoMoveTrigger(storage,e.target.value);
+  lastClick = {key:'',time:0};
 };
 $('card-art').onchange = e => {
   art.choice = e.target.value;
@@ -601,7 +622,7 @@ document.addEventListener('keydown', e => {
     if (fullscreen?.exitFallback()) { e.preventDefault(); return; }
     motion.cancel(); selected = null; announcement = ''; hintFeedback=''; setWarning(''); render();
   }
-  if (e.key.toLowerCase() === 'a' && selected) { e.preventDefault(); choose(selected,true); }
+  if (e.key.toLowerCase() === 'a' && selected) { e.preventDefault(); choose(selected,{autoTrigger:'keyboard'}); }
 });
 document.addEventListener('pointerdown', () => {
   if (!finishPlayback && !celebrating) motion.cancel();
