@@ -72,6 +72,8 @@ function autoMoveFreeCell(g, key, source) {
   const parent = source.a[source.i - 1];
   const foundationReady = card => card?.up && g.found.some(pile => fitsFoundation(pile, card));
   const uncoversFoundationCard = foundationReady(parent);
+  const canUseEmptySpace = uncoversFoundationCard ||
+    (source.t === 'col' && source.i > 0 && source.c.length === 1 && source.c[0].r === 13);
   const targetColumn = ({to}) => to.startsWith('col:') ? g.cols[parts(to)[1]] : undefined;
   const buildsOnColumn = move => {
     const top = targetColumn(move)?.at(-1);
@@ -80,8 +82,8 @@ function autoMoveFreeCell(g, key, source) {
   };
   const move = moves.find(move => move.to.startsWith('found:'))
     ?? moves.find(buildsOnColumn)
-    ?? ((source.t === 'cell' || uncoversFoundationCard) ? moves.find(move => targetColumn(move)?.length === 0) : null)
-    ?? (uncoversFoundationCard ? moves.find(move => move.to.startsWith('cell:')) : null);
+    ?? ((source.t === 'cell' || canUseEmptySpace) ? moves.find(move => targetColumn(move)?.length === 0) : null)
+    ?? (canUseEmptySpace ? moves.find(move => move.to.startsWith('cell:')) : null);
   return move ? applyMove(g, key, move.to) : false;
 }
 export function autoMove(g,key) {
