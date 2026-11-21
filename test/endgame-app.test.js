@@ -42,9 +42,9 @@ function eventTarget() {
 }
 function app(game,stored=new Map(),motionFactory=createCardMotion) {
   if(game)stored.set('kabale-session-v3',JSON.stringify({version:3,game,initial:game,past:[],future:[],elapsed:120000}));
-  const elements=new Map();
-  let preview, pointerTarget, clickTime=0;
-  const document={activeElement:null,addEventListener(){},
+  const elements=new Map(),timers=new Map();
+  let preview, pointerTarget, clickTime=0, nextTimer=0;
+  const document={...eventTarget(),activeElement:null,
     body:{classList:{add(){},remove(){}},append(element){preview=element;}},
     elementFromPoint:()=>pointerTarget,querySelector:()=>[...elements.values()].find(e=>e.open)??null};
   function el(id='') {
@@ -58,7 +58,8 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
   const context={...engine,...art,...hints,...settings,...i18n,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,planKlondikeHint,rememberStock,restoreStockMemory,createCardMotion:motionFactory,document,
     window,performance:{now:()=>clickTime+=100},
     getComputedStyle:()=>({paddingLeft:'8px',paddingRight:'8px'}),ResizeObserver:class{observe(){}},confirm:()=>true,
-    setTimeout:()=>1,clearTimeout(){},setInterval(){},Date,console,structuredClone};
+    setTimeout(callback,delay){timers.set(++nextTimer,{callback,delay});return nextTimer;},
+    clearTimeout:id=>timers.delete(id),setInterval(){},Date,console,structuredClone};
   vm.runInNewContext(dragSource+'\n'+source+';globalThis.api={state:()=>g,past:()=>past,choose,flush:saveNow};',context);
   function click(key) {
     const target={dataset:{key},closest:()=>target};
@@ -72,13 +73,14 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
       cloneNode:()=>({...el(),removeAttribute(){}})});
     const cards=context.api.state().cols[column].map((_,i)=>cardAt('col:'+column+':'+i));
     const target=cards[index];
-    pointerTarget=cardAt('col:'+destination);
+    pointerTarget=destination==null ? null : cardAt('col:'+destination);
     board.contains=element=>element===pointerTarget;
     const pointer={pointerId:1,pointerType:'touch',isPrimary:true,button:0,clientX:20,clientY:20,target,preventDefault(){this.defaultPrevented=true;}};
     board.emit('pointerdown',pointer);
     return {
       move(distance){window.emit('pointermove',{...pointer,clientY:pointer.clientY+distance});},
       release(distance){window.emit('pointerup',{...pointer,clientY:pointer.clientY+distance});},
+      cancel(){window.emit('pointercancel',pointer);},
       click(){
         const event={...pointer,detail:1};
         board.emit('click',event);
@@ -86,7 +88,12 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
       }
     };
   }
-  return {get:id=>document.getElementById(id),api:context.api,stored,click,startTouch,preview:()=>preview,window};
+  function expireTimer(id) {
+    const {callback}=timers.get(id);
+    timers.delete(id);
+    callback();
+  }
+  return {get:id=>document.getElementById(id),api:context.api,stored,click,startTouch,preview:()=>preview,window,document,timers,expireTimer};
 }
 
 test('real app finishes, saves final time/moves, and can undo the complete cleanup',()=>{
@@ -169,12 +176,147 @@ test('Hard completion keeps undo unavailable in the actual app',()=>{
   assert.equal(h.get('undo').disabled,true);assert.equal(h.get('end-undo').hidden,true);
 });
 
-test('Spider explains a blocked deal without declaring the board lost',()=>{
+test('Spider ignores a blocked stock click without declaring the board lost',()=>{
   const g=engine.deal('spider');g.cols=[[c(9)],...Array.from({length:9},()=>[])];
-  const h=app(g),stock=g.stock.length;h.api.choose('stock');
+  const h=app(g),stock=g.stock.length;h.click('stock');
   assert.equal(h.api.state().stock.length,stock);
-  assert.equal(h.get('message').textContent,'Fill every empty column before dealing from the stock.');
+  assert.equal(h.api.state().moves,0);
+  assert.equal(h.get('hint-feedback').hidden,true);
   assert.equal(h.get('end-dialog').open,false);
+});
+
+test('Klondike ignores clicks on an empty foundation and keeps the selected non-ace',()=>{
+  const g=board();g.cols[1]=[c(8,'♥')];
+  const h=app(g),table=h.get('board'),feedback=h.get('hint-feedback');
+  assert.match(table.innerHTML,/class="placeholder empty-target" data-key="found:0"/);
+
+  h.click('found:0');
+  assert.equal(feedback.hidden,true);
+  assert.doesNotMatch(table.innerHTML,/aria-pressed="true"/);
+
+  h.click('col:0:0');
+  for (let i=0;i<2;i++) {
+    h.click('found:0');
+    assert.equal(feedback.hidden,true);
+    assert.equal(h.api.state().moves,g.moves);
+    assert.equal(h.api.state().found[0].length,0);
+    assert.match(table.innerHTML,/data-key="col:0:0"[^>]*aria-pressed="true"/);
+  }
+
+  h.click('col:1:0');
+  assert.equal(h.api.state().moves,g.moves+1);
+  assert.equal(h.api.state().cols[1].at(-1)?.id,c(7).id);
+});
+
+test('undo and redo announce the move without showing a toast',()=>{
+  const g=board();g.cols[1]=[c(8,'♥')];
+  const h=app(g),feedback=h.get('hint-feedback'),message=h.get('message');
+  h.click('col:0:0');h.click('col:1:0');
+
+  h.get('undo').onclick();
+  assert.equal(h.api.state().moves,g.moves);
+  assert.equal(h.api.state().cols[0].at(-1)?.id,c(7).id);
+  assert.equal(feedback.hidden,true);
+  assert.equal(message['aria-live'],'polite');
+  assert.equal(message.textContent,'Move undone.');
+
+  h.get('redo').onclick();
+  assert.equal(h.api.state().moves,g.moves+1);
+  assert.equal(h.api.state().cols[1].at(-1)?.id,c(7).id);
+  assert.equal(feedback.hidden,true);
+  assert.equal(message.textContent,'Move restored.');
+});
+
+test('missed drops and drag cancellation return the card and restore the idle message',()=>{
+  const g=board();g.cols[1]=[c(8,'♥')];
+  const h=app(g),message=h.get('message'),idle=message.textContent;
+  const finish = [touch=>touch.release(12),touch=>touch.cancel(),
+    ()=>h.window.emit('resize',{}),()=>h.document.emit('keydown',{key:'Escape',target:{tagName:'BUTTON'}})];
+  for (const end of finish) {
+    const touch=h.startTouch(0,0,null);
+    touch.move(12);
+    assert.ok(h.preview());
+    assert.equal(message.textContent,'Release to place the card. Escape cancels.');
+
+    end(touch);
+    assert.equal(h.preview(),undefined);
+    assert.equal(h.api.state().moves,g.moves);
+    assert.equal(h.api.state().cols[0].at(-1)?.id,c(7).id);
+    assert.equal(h.get('hint-feedback').hidden,true);
+    assert.equal(message['aria-live'],'polite');
+    assert.equal(message.textContent,idle);
+  }
+});
+
+test('a storage read warning expires after eight seconds without restarting on render',()=>{
+  const h=app(null,new Map([['kabale-session-v3','{']]));
+  const feedback=h.get('hint-feedback');
+  assert.equal(feedback.hidden,false);
+  assert.match(h.get('hint-feedback-text').textContent,/Your saved game could not be loaded/);
+  const [[warningTimer,{delay}]]=h.timers;
+  assert.equal(delay,8000);
+
+  h.get('card-art').onchange({target:{value:'contrast'}});
+  assert.deepEqual([...h.timers.keys()],[warningTimer]);
+  h.expireTimer(warningTimer);
+  assert.equal(feedback.hidden,true);
+  assert.equal(h.get('message')['aria-live'],'polite');
+});
+
+test('replaced and explicitly dismissed warnings cannot dismiss newer feedback',()=>{
+  const g=board();g.cols[1]=[c(8,'♥')];
+  const h=app(g),feedback=h.get('hint-feedback'),label=h.get('hint-feedback-text');
+  h.stored.set=()=>{throw new Error('Storage blocked');};
+  h.api.flush();
+  const [[first,{callback:stale}]]=h.timers;
+  h.api.flush();
+  assert.equal(h.timers.has(first),false);
+  const [[second,{callback:dismissed}]]=h.timers;
+  stale();
+  assert.equal(feedback.hidden,false);
+  assert.match(label.textContent,/storage is unavailable/i);
+
+  h.get('hint-feedback-close').onclick();
+  assert.equal(h.timers.has(second),false);
+  assert.equal(feedback.hidden,true);
+  h.get('hint').onclick();
+  assert.equal(feedback.dataset.hint,'true');
+  assert.equal(h.timers.size,0);
+  const hint=label.textContent;
+  dismissed();
+  assert.equal(feedback.hidden,false);
+  assert.equal(label.textContent,hint);
+});
+
+test('requesting a hint dismisses the active warning and shows the hint immediately',()=>{
+  const g=engine.deal('freecell');g.cols=[[c(7)],[c(8,'♥')],[],[],[],[],[],[]];
+  const h=app(g);
+  h.stored.set=()=>{throw new Error('Storage blocked');};
+  h.api.flush();
+  h.get('hint').onclick();
+  assert.match(h.get('hint-feedback-text').textContent,/Move 7/);
+  assert.equal(h.get('hint-feedback').dataset.hint,'true');
+  assert.equal(h.timers.size,0);
+});
+
+test('a warning pauses its dismissal timer while Dismiss has focus',()=>{
+  const h=app(null,new Map([['kabale-session-v3','{']]));
+  const button=h.get('hint-feedback-close');
+  const [[initial,{callback:stale}]]=h.timers;
+  h.document.activeElement=button;
+  button.emit('focus',{});
+  assert.equal(h.timers.has(initial),false);
+  stale();
+  assert.equal(h.get('hint-feedback').hidden,false);
+
+  h.document.activeElement=null;
+  button.emit('blur',{});
+  const [[resumed,{delay}]]=h.timers;
+  assert.equal(delay,7900);
+  stale();
+  assert.equal(h.get('hint-feedback').hidden,false);
+  h.expireTimer(resumed);
+  assert.equal(h.get('hint-feedback').hidden,true);
 });
 
 test('Hint gives visible feedback when all remaining suggestions repeat, without declaring a loss',()=>{
@@ -189,9 +331,10 @@ test('Hint gives visible feedback when all remaining suggestions repeat, without
   assert.equal(h.get('message')['aria-live'],'off');
   h.get('hint-feedback-close').onclick();assert.equal(h.get('hint-feedback').hidden,true);
   assert.equal(h.get('message')['aria-live'],'polite');
-  h.get('hint').onclick();h.api.choose('col:0:0');
+  h.get('hint').onclick();h.click('col:0:0');
   assert.equal(h.get('hint-feedback').dataset.hint,'false');
-  assert.match(h.get('hint-feedback-text').textContent,/no legal move for that card/);
+  assert.equal(h.get('hint-feedback').hidden,true);
+  assert.equal(h.get('hint-feedback-text').textContent,'');
 });
 
 test('a stock recycle hint marks the empty Redeal pile and explains its action',()=>{
@@ -245,8 +388,16 @@ test('Pyramid reveals the hinted stock and moves a colliding toast without resiz
   h.stored.set=()=>{throw new Error('Storage blocked');};
   h.api.flush();
   assert.match(h.get('hint-feedback-text').textContent,/storage is unavailable/i);
+  assert.equal(toast.dataset.hint,'false');
   assert.equal(toast.dataset.corner,'top-right');
   assert.match(table.innerHTML,/hint-source[^>]*data-key="stock"[^>]*>/);
+  const [[warningTimer,{delay}]]=h.timers;
+  assert.equal(delay,8000);
+  h.expireTimer(warningTimer);
+  assert.equal(toast.hidden,false);
+  assert.equal(toast.dataset.hint,'true');
+  assert.equal(h.get('hint-feedback-text').textContent,'Draw from the stock.');
+  assert.equal(toast.dataset.corner,'top-right');
 
   Object.assign(h.window,{innerWidth:1280,innerHeight:768});
   h.window.emit('resize',{});
@@ -324,14 +475,12 @@ test('FreeCell keeps the selected stack after repeated clicks on an occupied fre
   g.cols=[[c(7),c(6,'♥')],[c(8,'♥')],[],[],[],[],[],[]];
   g.cells[0]=c(1);
   const h=app(g);
-  const rejection='That move is not available. Choose another card or destination.';
 
   h.click('col:0:0');
   for (let i=0;i<2;i++) {
     h.click('cell:0');
     assert.equal(h.api.state().moves,0);
-    assert.equal(h.get('hint-feedback').hidden,false);
-    assert.equal(h.get('hint-feedback-text').textContent,rejection);
+    assert.equal(h.get('hint-feedback').hidden,true);
     assert.match(h.get('board').innerHTML,/data-key="col:0:0"[^>]*aria-pressed="true"/);
   }
 
@@ -362,7 +511,8 @@ test('FreeCell blocks the four-card king run but lets the player drag the three-
   tap.move(3);
   tap.release(3);
   assert.equal(tap.click(),false);
-  assert.equal(h.get('message').textContent,'There is no legal move for that card.');
+  assert.equal(h.get('message').textContent,instruction);
+  assert.equal(h.get('hint-feedback').hidden,true);
 
   const queen=h.startTouch(0,1,1);
   queen.move(12);

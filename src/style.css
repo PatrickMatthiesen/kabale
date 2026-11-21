@@ -210,7 +210,6 @@
 }
 #board .empty-target span { padding: 0; font: inherit; }
 #board[data-side-reserves="true"] {
-  --rail-width: calc(var(--card-w) * .64);
   display: grid;
   grid-template-columns: var(--rail-width) var(--tableau-width, 1fr) var(--rail-width);
   grid-template-areas: "start tableau end";

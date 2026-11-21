@@ -28,8 +28,10 @@ const names = { klondike: '7-kabale', spider: 'Spider', freecell: 'FreeCell', py
 const storageKey = 'kabale-session-v3';
 let g = deal('klondike', 'normal', { emptyColumns });
 let initial = structuredClone(g), past = [], future = [], selected = null, hint = null;
-let elapsed = 0, resumedAt = Date.now(), notice = '', lastClick = { key: '', time: 0 };
+let elapsed = 0, resumedAt = Date.now(), announcement = '', lastClick = { key: '', time: 0 };
 let hintFeedback = '';
+let warning = null;
+let dragging = false;
 let saveTimer;
 let seenEndNotices = new Set();
 try {
@@ -41,7 +43,7 @@ try {
     elapsed = Number.isFinite(saved.elapsed) ? saved.elapsed : 0;
     seenEndNotices = new Set(Array.isArray(saved.seenEndNotices) ? saved.seenEndNotices.filter(k=>typeof k==='string') : []);
   }
-} catch { notice = tr('Your saved game could not be loaded. A fresh table is ready.'); }
+} catch { setWarning('Your saved game could not be loaded. A fresh table is ready.'); }
 if (g.mode === 'klondike') emptyColumns = g.emptyColumns ?? 'kings';
 restoreStockMemory([...past,g,...future.slice().reverse()]);
 let hintPositions = new Set([...past,g].map(hintVisitKey));
@@ -98,7 +100,7 @@ function fitBoard() {
   cardPixels = layout.cardWidth;
   board.dataset.sideReserves = String(sideReserves);
   const tableauWidth = layout.columns * layout.cardWidth + (layout.columns - 1) * layout.gap;
-  for (const [name,value] of Object.entries({ 'table-height':boardHeight, 'tableau-width':tableauWidth, 'card-w':layout.cardWidth, 'layout-gap':layout.gap, 'face-step':layout.faceStep, 'back-step':layout.backStep })) {
+  for (const [name,value] of Object.entries({ 'table-height':boardHeight, 'tableau-width':tableauWidth, 'rail-width':layout.railWidth, 'card-w':layout.cardWidth, 'layout-gap':layout.gap, 'face-step':layout.faceStep, 'back-step':layout.backStep })) {
     board.style.setProperty(`--${name}`, `${value}px`);
   }
   refreshArtResolution();
@@ -108,6 +110,7 @@ new ResizeObserver(() => {
   placeFeedback();
 }).observe(board);
 window.addEventListener('resize', () => {
+  cancelDrag();
   fitBoard();
   if (finishPlayback) finishPlayback(false);
   else motion.cancel();
@@ -120,9 +123,7 @@ function saveNow() {
   clearTimeout(saveTimer);
   try { storage.setItem(storageKey, JSON.stringify({version: 3, game: g, initial, past, future, elapsed: clock(), seenEndNotices:[...seenEndNotices]})); }
   catch {
-    notice = tr('Browser storage is unavailable. Keep this tab open to retain your game.');
-    hintFeedback = '';
-    $('message').textContent = notice;
+    setWarning('Browser storage is unavailable. Keep this tab open to retain your game.');
     renderFeedback();
   }
 }
@@ -233,7 +234,7 @@ function renderBoard(display) {
   board.innerHTML = html;
 }
 function render(newWin = false) {
-  cardDrag?.cancel();
+  cancelDrag();
   board.dataset.mode = g.mode;
   fitBoard();
   const focusKey = document.activeElement?.dataset.key;
@@ -261,19 +262,49 @@ function render(newWin = false) {
   }));
   $('rules-challenge').textContent = rules.challenge;
   renderBoard(g);
-  $('message').textContent = g.won ? tr('The table is cleared. Well played.')
-    : notice || tr(selected ? 'Choose a destination. Escape cancels your selection.' : 'Drag a card, or select it and its destination.');
   if (focusKey) board.querySelector(`button[data-key="${focusKey}"]:not(:disabled)`)?.focus({preventScroll:true});
   updateEndgame(newWin);
   fitBoard();
   renderFeedback();
+  renderMessage();
+}
+function renderMessage() {
+  const text = dragging ? tr('Release to place the card. Escape cancels.')
+    : announcement || tr(g.won ? 'The table is cleared. Well played.'
+      : selected ? 'Choose a destination. Escape cancels your selection.' : 'Drag a card, or select it and its destination.');
+  const message = $('message');
+  if (message.textContent !== text) message.textContent = text;
+}
+function setWarning(text) {
+  clearTimeout(warning?.timer);
+  if (!text) { warning = null; return; }
+  warning = {text,remaining:8000};
+  if (document.activeElement !== $('hint-feedback-close')) resumeWarning();
+}
+function resumeWarning() {
+  const current = warning;
+  if (!current || current.timer !== undefined) return;
+  current.deadline = performance.now() + current.remaining;
+  const timer = setTimeout(() => {
+    if (warning !== current || current.timer !== timer) return;
+    warning = null;
+    renderFeedback();
+  },current.remaining);
+  current.timer = timer;
+}
+function pauseWarning() {
+  if (warning?.timer === undefined) return;
+  clearTimeout(warning.timer);
+  warning.timer = undefined;
+  warning.remaining = Math.max(0,warning.deadline - performance.now());
 }
 function renderFeedback() {
-  const text = hintFeedback || notice;
-  $('message').setAttribute('aria-live',text ? 'off' : 'polite');
+  const text = warning ? tr(warning.text) : hintFeedback;
+  $('message').setAttribute('aria-live',text && !dragging && !announcement ? 'off' : 'polite');
   feedback.hidden = !text;
-  feedback.dataset.hint = String(Boolean(hintFeedback));
-  $('hint-feedback-text').textContent = text;
+  feedback.dataset.hint = String(!warning && Boolean(hintFeedback));
+  const label = $('hint-feedback-text');
+  if (label.textContent !== text) label.textContent = text;
   placeFeedback();
 }
 function hintCardBounds(card) {
@@ -368,20 +399,25 @@ async function playFinish(display, path, previous) {
     complete(false);
   }
 }
-function action(fn, finishPlan = null) {
+function action(fn, {finishPlan, quiet} = {}) {
   if (finishPlayback) return false;
-  hintFeedback='';
   const before = structuredClone(g);
-  if (!fn()) { notice = tr('That move is not available. Choose another card or destination.'); render(); return false; }
+  if (!fn()) {
+    if (!quiet) {
+      setWarning('That move is not available. Choose another card or destination.');
+      render();
+    }
+    return false;
+  }
   rememberStock(g,before);
   if (g.difficulty !== 'hard') { past.push(before); if (past.length > 100) past.shift(); }
   if (g.difficulty !== 'hard') hintPositions.add(hintVisitKey(g));
-  future = []; selected = null; hint = null; notice = '';
+  future = []; selected = null; hint = null; hintFeedback = ''; announcement = '';
   if (g.mode === 'freecell') lastClick = {key:'',time:0};
   if (g.won) elapsed += Date.now() - resumedAt;
   updateClock(); save();
   if (g.won) {
-    cardDrag?.cancel();
+    cancelDrag();
     const previous = motion.capture();
     if (finishPlan && motion.enabled()) void playFinish(structuredClone(before),finishPlan,previous);
     else celebrate(previous);
@@ -389,26 +425,27 @@ function action(fn, finishPlan = null) {
   return true;
 }
 function choose(key, automatic = false) {
+  if (g.won) return;
   hintFeedback='';
   hint = null;
-  if (g.won) return;
+  announcement = '';
+  const attempt = fn => action(fn,{quiet:true});
   if (key === 'stock') {
-    if (g.mode==='spider' && g.stock.length && g.cols.some(col=>!col.length)) {
-      notice=tr('Fill every empty column before dealing from the stock.'); render(); return;
-    }
-    action(() => applyMove(g,'stock','stock')); return;
+    if (attempt(() => applyMove(g,'stock','stock'))) return;
+  } else if (g.mode === 'freecell' && selected && key !== selected && key?.startsWith('cell:')) {
+    if (attempt(() => applyMove(g,selected,key))) return;
+    lastClick = {key:'',time:0};
+  } else if (automatic) {
+    if (attempt(() => autoMove(g,key))) return;
+  } else if (g.mode === 'pyramid' && legalMoves(g).some(m => m.from === key && m.to === key)) {
+    if (attempt(() => applyMove(g,key,key))) return;
+  } else if (key === selected) {
+    selected = null;
+  } else {
+    if (selected && attempt(() => applyMove(g,selected,key))) return;
+    if (legalMoves(g).some(m => m.from === key)) selected = key;
   }
-  if (g.mode === 'freecell' && selected && key !== selected && key?.startsWith('cell:')) {
-    if (!action(() => applyMove(g,selected,key))) lastClick = {key:'',time:0};
-    return;
-  }
-  if (automatic) { action(() => autoMove(g,key)); return; }
-  if (g.mode === 'pyramid' && legalMoves(g).some(m => m.from === key && m.to === key)) { action(() => applyMove(g,key,key)); return; }
-  if (key === selected) { selected = null; notice = ''; render(); return; }
-  if (selected && action(() => applyMove(g, selected, key))) return;
-  const playable = legalMoves(g).some(m => m.from === key);
-  if (playable) { selected = key; notice = ''; render(); }
-  else if (!selected) { notice = tr('There is no legal move for that card.'); render(); }
+  render();
 }
 board.addEventListener('click', e => {
   const target = e.target.closest('[data-key]');
@@ -429,7 +466,7 @@ function undo(redo = false) {
   celebrating = false;
   motion.cancel();
   hintFeedback='';
-  elapsed = clock(); to.push(structuredClone(g)); g = from.pop(); selected = null; hint = null; notice = tr(redo ? 'Move restored.' : 'Move undone.');
+  elapsed = clock(); to.push(structuredClone(g)); g = from.pop(); selected = null; hint = null; announcement = tr(redo ? 'Move restored.' : 'Move undone.');
   hintPositions = new Set([...past,g].map(hintVisitKey));
   resumedAt = Date.now(); save(); render();
 }
@@ -438,14 +475,14 @@ function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyR
   if (g.moves && !g.won && !confirm(tr(restart ? 'Restart this deal? Your moves will be cleared.' : 'Start a new deal? Your current game will be replaced.'))) return false;
   celebrating = false;
   motion.cancel();
-  cardDrag?.cancel();
+  cancelDrag();
   const previous = animate ? motion.capture() : null;
   g = restart ? structuredClone(initial) : deal(mode,difficulty,{emptyColumns:emptyRule});
   rememberStock(g);
   emptyColumns = g.mode === 'klondike' ? (g.emptyColumns ?? 'kings') : emptyRule;
   saveEmptyColumns(storage,emptyColumns);
   if (!restart) { art.resolved = resolveArt(art.choice); saveArt(storage, art); }
-  initial = structuredClone(g); past = []; future = []; selected = null; hint = null; elapsed = 0; resumedAt = Date.now(); notice = '';
+  initial = structuredClone(g); past = []; future = []; selected = null; hint = null; elapsed = 0; resumedAt = Date.now(); announcement = '';
   hintPositions = new Set([hintVisitKey(g)]);
   hintFeedback='';
   seenEndNotices.clear(); endgameUI?.reset();
@@ -464,7 +501,7 @@ $('language').onchange = e => {
   language = saveLanguage(storage,e.target.value);
   hint = null;
   hintFeedback = '';
-  notice = '';
+  announcement = '';
   applyLanguage();
   render();
 };
@@ -491,32 +528,45 @@ $('undo').onclick = () => undo();
 $('redo').onclick = () => undo(true);
 $('hint').onclick = () => {
   if (g.difficulty === 'hard' || g.won) return;
+  setWarning('');
   selected=null;
+  announcement = '';
   const plan = g.mode === 'klondike' ? planKlondikeHint(g,g.stockMemory,{visited:hintPositions,maxTimeMs:35}) : null;
   hint = plan ? plan.move : selectHint(g,hintPositions);
   if (!hint) {
-    notice = tr(legalMoves(g).length ? 'No useful continuation found. Try another approach or undo a move.' : 'No legal moves remain from this position.');
+    hintFeedback = tr(legalMoves(g).length ? 'No useful continuation found. Try another approach or undo a move.' : 'No legal moves remain from this position.');
   } else if (hint.from === 'stock') {
-    notice = tr(g.stock.length ? 'Draw from the stock.' : 'Recycle the waste into the stock.');
-    if (plan?.reason === 'explore') notice += ' ' + tr('There are still unseen cards to check.');
+    hintFeedback = tr(g.stock.length ? 'Draw from the stock.' : 'Recycle the waste into the stock.');
+    if (plan?.reason === 'explore') hintFeedback += ' ' + tr('There are still unseen cards to check.');
     else if (plan?.goal === 'waste') {
       const count = plan.path.length - 1;
-      notice += ' ' + tr(count === 1 ? 'A known waste card is playable after {count} stock action.' : 'A known waste card is playable after {count} stock actions.',{count});
+      hintFeedback += ' ' + tr(count === 1 ? 'A known waste card is playable after {count} stock action.' : 'A known waste card is playable after {count} stock actions.',{count});
     }
   } else {
-    notice = describeCardHint(g,hint);
-    if (plan?.path.length > 1 && plan.goal === 'reveal') notice += ' ' + tr('This sets up a move that uncovers a card.');
-    if (plan?.path.length > 1 && plan.goal === 'foundation') notice += ' ' + tr('This opens a path to the foundation.');
-    if (plan?.path.length > 1 && plan.goal === 'waste') notice += ' ' + tr('This opens a play from the waste.');
+    hintFeedback = describeCardHint(g,hint);
+    if (plan?.path.length > 1 && plan.goal === 'reveal') hintFeedback += ' ' + tr('This sets up a move that uncovers a card.');
+    if (plan?.path.length > 1 && plan.goal === 'foundation') hintFeedback += ' ' + tr('This opens a path to the foundation.');
+    if (plan?.path.length > 1 && plan.goal === 'waste') hintFeedback += ' ' + tr('This opens a play from the waste.');
   }
-  hintFeedback=notice;
   render();
   revealHintSource();
 };
-$('hint-feedback-close').onclick=()=>{hint=null;hintFeedback='';notice='';render();};
+const dismissFeedback = $('hint-feedback-close');
+dismissFeedback.onclick=()=>{hint=null;hintFeedback='';announcement='';setWarning('');render();};
+dismissFeedback.addEventListener('focus',pauseWarning);
+dismissFeedback.addEventListener('blur',resumeWarning);
 $('rules').onclick = () => $('rules-dialog').showModal();
 $('settings-open').onclick = () => $('settings-dialog').showModal();
 
+function endDrag() {
+  dragging = false;
+  renderFeedback();
+  renderMessage();
+}
+function cancelDrag() {
+  cardDrag?.cancel();
+  if (dragging) endDrag();
+}
 cardDrag = attachCardDrag(board, {
   getMoves: () => g.won ? [] : legalMoves(g),
   canLift: (from,targets) => {
@@ -525,20 +575,19 @@ cardDrag = attachCardDrag(board, {
     return Number(index) === g.cols[column].length - 1;
   },
   onStart: () => {
-    hintFeedback=''; feedback.hidden=true;
-    $('message').setAttribute('aria-live','polite');
+    dragging = true;
+    hintFeedback=''; announcement='';
     hint=null; selected=null; lastClick={key:'',time:0};
+    board.querySelector('[aria-pressed="true"]')?.setAttribute('aria-pressed','false');
     board.querySelectorAll('.hinted,.hint-source,.hint-destination,.selected').forEach(el=>el.classList.remove('hinted','hint-source','hint-destination','selected'));
-    $('message').textContent=tr('Release to place the card. Escape cancels.');
+    renderFeedback();
+    renderMessage();
   },
   onDrop: (from,to) => {
-    if (to) action(()=>applyMove(g,from,to));
-    else { notice=tr('Card returned to its original position.'); render(); }
+    dragging = false;
+    if (!to || !action(()=>applyMove(g,from,to),{quiet:true})) render();
   },
-  onCancel: () => {
-    notice=tr('Move cancelled.');
-    $('message').textContent=notice;
-  }
+  onCancel: endDrag
 });
 document.addEventListener('keydown', e => {
   if (finishPlayback) {
@@ -550,7 +599,7 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(e.shiftKey); }
   if (e.key === 'Escape') {
     if (fullscreen?.exitFallback()) { e.preventDefault(); return; }
-    motion.cancel(); selected = null; notice = ''; hintFeedback=''; render();
+    motion.cancel(); selected = null; announcement = ''; hintFeedback=''; setWarning(''); render();
   }
   if (e.key.toLowerCase() === 'a' && selected) { e.preventDefault(); choose(selected,true); }
 });
@@ -573,12 +622,12 @@ endgameUI=attachEndgameUI({
     for(const move of plan) if(!applyMove(completed,move.from,move.to)) return false;
     if(!completed.won) return false;
     g=completed; return true;
-  },plan)
+  },{finishPlan:plan})
 });
 for(const id of ['rules-dialog','settings-dialog']) $(id).addEventListener('close',()=>updateEndgame());
 const fullscreen = document.documentElement ? attachFullscreen(document.documentElement,$('fullscreen'),() => {
   if (finishPlayback) finishPlayback(false);
-  cardDrag?.cancel();
+  cancelDrag();
   motion.cancel();
   fitBoard();
   placeFeedback();

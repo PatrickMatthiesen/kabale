@@ -1,4 +1,4 @@
-import { applyMove, legalMoves } from './engine.js';
+import { applyMove, legalMoves, movesFrom, runValid } from './engine.js';
 
 // Ignore move counters and interchangeable column/cell/foundation positions.
 // Hidden identities never participate in hint selection.
@@ -26,6 +26,35 @@ export function hintPosition(game) {
 // Both counts therefore identify the stock phase without knowing any card faces.
 export function hintVisitKey(game) {
   return positionKey(game,game.mode === 'klondike');
+}
+
+function equivalentParents(parent, destination, mode) {
+  const isRed = card => card.s === '♥' || card.s === '♦';
+  return parent && destination && parent.r === destination.r &&
+    (mode === 'spider' ? parent.s === destination.s : isRed(parent) === isRed(destination));
+}
+
+function opensFreeCellMove(before, after, column, seen) {
+  const pile = after.cols[column];
+  // Only check the tails left in the original source column, one move ahead.
+  for (let start = pile.length - 1; start >= 0; start--) {
+    if (!runValid(pile.slice(start), after.mode)) break;
+    const from = `col:${column}:${start}`;
+    const useful = movesFrom(after, from).filter(({to}) => {
+      if (to.startsWith('found:')) return true;
+      const destination = to.startsWith('col:') && after.cols[+to.split(':')[1]].at(-1);
+      return destination && !equivalentParents(pile[start-1], destination, after.mode);
+    });
+    if (!useful.length) continue;
+
+    const previous = movesFrom(before, from);
+    for (const {to} of useful) {
+      if (previous.some(move => move.to === to)) continue;
+      const followUp = structuredClone(after);
+      if (applyMove(followUp, from, to) && !seen(followUp)) return true;
+    }
+  }
+  return false;
 }
 
 /** Choose a useful, unvisited move without solving or inspecting hidden cards. */
@@ -72,7 +101,10 @@ export function selectHint(game, visited = new Set()) {
         const card=source[start], parent=source[start-1], destination=target.at(-1);
         if (game.mode === 'spider') score=destination.s===card.s ? 35 : 5;
         else score=20;
-        if (parent && parent.r===destination.r && (game.mode === 'spider' ? parent.s===destination.s : (['♥','♦'].includes(parent.s) === ['♥','♦'].includes(destination.s)))) score=0;
+        if (equivalentParents(parent,destination,game.mode)) {
+          // A productive swap outranks parking, but still trails ordinary progress.
+          score=game.mode === 'freecell' && opensFreeCellMove(visible,next,+column,seen) ? 2 : 0;
+        }
       } else if (move.to.startsWith('cell:')) score=1;
       else score=5;
       if (kind === 'found') score=0;

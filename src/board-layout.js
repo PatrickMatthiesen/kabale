@@ -1,6 +1,8 @@
 const columnsByMode = { klondike: 7, spider: 10, freecell: 8, pyramid: 7 };
 const MIN_READABLE_CARD_WIDTH = 40;
 const MAX_CARD_WIDTH = 160;
+const MIN_RAIL_WIDTH_RATIO = .64;
+const RAIL_CARD_COUNT = 4;
 
 function cardMetrics(cardWidth, indexScale) {
   // Keep the rank and suit row clear of the next card, at every size.
@@ -14,7 +16,7 @@ function cardMetrics(cardWidth, indexScale) {
   return { cardHeight, faceStep, backStep, minFaceStep, minBackStep };
 }
 
-function layoutMetrics(mode, cardWidth, stacks, reserveGap, indexScale, sideReserves, gap, availableHeight) {
+function layoutMetrics(mode, cardWidth, stacks, reserveGap, indexScale, sideReserves, railGaps, availableHeight) {
   const metrics = cardMetrics(cardWidth, indexScale);
   const { cardHeight, minFaceStep, minBackStep } = metrics;
   if (mode === 'pyramid') return { ...metrics, requiredHeight: 3.92 * cardHeight + reserveGap };
@@ -31,7 +33,7 @@ function layoutMetrics(mode, cardWidth, stacks, reserveGap, indexScale, sideRese
   metrics.faceStep = minFaceStep + compression * (metrics.faceStep - minFaceStep);
   metrics.backStep = minBackStep + compression * (metrics.backStep - minBackStep);
   const tallestStack = stacks.reduce((max, stack) => Math.max(max, (stack.face || 0) * metrics.faceStep + (stack.back || 0) * metrics.backStep), 0);
-  const railHeight = sideReserves ? 4 * (.64 * cardHeight) + 3 * gap : 0;
+  const railHeight = sideReserves ? RAIL_CARD_COUNT * (MIN_RAIL_WIDTH_RATIO * cardHeight) + railGaps : 0;
   return { ...metrics, requiredHeight: Math.max(baseHeight + tallestStack, railHeight) };
 }
 
@@ -50,20 +52,22 @@ export function boardLayout(mode, contentWidth, availableHeight = Infinity, prof
   const stacks = Array.isArray(profile.stacks) ? profile.stacks : initialStacks(mode);
   const indexScale = profile.indexScale ?? 1;
   const sideReserves = (mode === 'freecell' || mode === 'klondike') && Boolean(profile.sideReserves);
-  const widthUse = sideReserves ? columns + 1.28 : columns;
+  const widthUse = sideReserves ? columns + 2 * MIN_RAIL_WIDTH_RATIO : columns;
   const widthGaps = sideReserves ? columns + 1 : columns - 1;
-  const widthLimit = Math.max(0, Math.min(MAX_CARD_WIDTH, (contentWidth - widthGaps * gap - 1) / widthUse));
+  const widthBudget = contentWidth - widthGaps * gap - 1;
+  const widthLimit = Math.max(0, Math.min(MAX_CARD_WIDTH, widthBudget / widthUse));
   const minWidth = Math.min(widthLimit, MIN_READABLE_CARD_WIDTH);
   const heightLimit = Number.isFinite(availableHeight) ? Math.max(0, availableHeight) : Infinity;
+  const railGaps = (RAIL_CARD_COUNT - 1) * gap;
 
   // Height grows monotonically with card width, so binary search finds the
   // largest readable cards that fit this deal without clipping its last card.
   let low = minWidth;
   let high = widthLimit;
-  if (layoutMetrics(mode, low, stacks, reserveGap, indexScale, sideReserves, gap, heightLimit).requiredHeight <= heightLimit) {
+  if (layoutMetrics(mode, low, stacks, reserveGap, indexScale, sideReserves, railGaps, heightLimit).requiredHeight <= heightLimit) {
     for (let i = 0; i < 32 && high - low > .01; i++) {
       const middle = (low + high) / 2;
-      if (layoutMetrics(mode, middle, stacks, reserveGap, indexScale, sideReserves, gap, heightLimit).requiredHeight <= heightLimit) low = middle;
+      if (layoutMetrics(mode, middle, stacks, reserveGap, indexScale, sideReserves, railGaps, heightLimit).requiredHeight <= heightLimit) low = middle;
       else high = middle;
     }
   } else if (mode !== 'pyramid') {
@@ -72,7 +76,14 @@ export function boardLayout(mode, contentWidth, availableHeight = Infinity, prof
   }
 
   const cardWidth = Math.floor(low * 100) / 100;
-  const { faceStep, backStep, requiredHeight: neededHeight } = layoutMetrics(mode, cardWidth, stacks, reserveGap, indexScale, sideReserves, gap, heightLimit);
+  const { faceStep, backStep, requiredHeight: neededHeight } = layoutMetrics(mode, cardWidth, stacks, reserveGap, indexScale, sideReserves, railGaps, heightLimit);
   const fits = cardWidth <= widthLimit + .01 && neededHeight <= heightLimit + .01;
-  return { columns, gap, cardWidth, faceStep, backStep, fits, sideReserves, overflow: Math.max(0, neededHeight - heightLimit) };
+  let railWidth = 0;
+  if (sideReserves) {
+    // Grow the rails after fitting the tableau. Extra rail width uses space within the fit limits.
+    const horizontalLimit = (widthBudget - columns * cardWidth) / 2;
+    const verticalLimit = (heightLimit - railGaps) / RAIL_CARD_COUNT * 9 / 14;
+    railWidth = Math.max(MIN_RAIL_WIDTH_RATIO * cardWidth, Math.min(cardWidth, horizontalLimit, verticalLimit));
+  }
+  return { columns, gap, cardWidth, railWidth, faceStep, backStep, fits, sideReserves, overflow: Math.max(0, neededHeight - heightLimit) };
 }

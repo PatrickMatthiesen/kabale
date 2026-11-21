@@ -97,10 +97,53 @@ test('FreeCell side reserves fit in the width and height calculations', () => {
   const stacks = Array.from({ length: 8 }, (_, i) => ({ face: i < 4 ? 7 : 6, back: 0 }));
   const layout = boardLayout('freecell',1200,900,{ stacks, sideReserves: true });
   assert.equal(layout.sideReserves, true);
-  assert.ok(8 * layout.cardWidth + 9 * layout.gap + 1.28 * layout.cardWidth + 1 <= 1200);
+  assert.equal(layout.fits, true);
+  assert.ok(layout.railWidth >= .64 * layout.cardWidth);
+  assert.ok(8 * layout.cardWidth + 9 * layout.gap + 2 * layout.railWidth + 1 <= 1200);
   const height = Math.max(
     layout.cardWidth * 14 / 9 + 7 * layout.faceStep,
-    4 * (.64 * layout.cardWidth * 14 / 9) + 3 * layout.gap
+    4 * (layout.railWidth * 14 / 9) + 3 * layout.gap
   );
   assert.ok(height <= 900);
 });
+
+for (const { mode, stacks, widthLimited, shortWidth, shortHeight } of [
+  { mode: 'klondike', stacks: [{ face: 12, back: 6 }], widthLimited: 1430, shortWidth: 1440, shortHeight: 600 },
+  { mode: 'freecell', stacks: [{ face: 16 }], widthLimited: 1600, shortWidth: 1600, shortHeight: 660 },
+]) {
+  const profile = { stacks, reserveGap: 12 };
+  const sideProfile = { ...profile, sideReserves: true };
+
+  test(`${mode} side rails reach tableau width on a wide, tall board`, () => {
+    const side = boardLayout(mode, 1800, 1030, sideProfile);
+    const top = boardLayout(mode, 1800, 1030, profile);
+    assert.equal(side.fits, true);
+    assert.ok(side.cardWidth > top.cardWidth + 2, 'the side layout is large enough to be selected');
+    assert.equal(side.railWidth, side.cardWidth);
+    assert.equal(top.railWidth, 0);
+  });
+
+  test(`${mode} side rails use spare width after fitting the tableau`, () => {
+    const wide = boardLayout(mode, 1800, 1030, sideProfile);
+    const side = boardLayout(mode, widthLimited, 1030, sideProfile);
+    assert.equal(side.fits, true);
+    assert.equal(side.cardWidth, wide.cardWidth);
+    assert.ok(side.railWidth > .64 * side.cardWidth && side.railWidth < side.cardWidth);
+    const usedWidth = side.columns * side.cardWidth + (side.columns + 1) * side.gap + 2 * side.railWidth;
+    assert.ok(Math.abs(usedWidth + 1 - widthLimited) < .000001);
+  });
+
+  test(`${mode} side rails respect available height and retain their minimum when scrolling`, () => {
+    const short = boardLayout(mode, shortWidth, shortHeight, sideProfile);
+    assert.equal(short.fits, true);
+    assert.ok(short.railWidth > .64 * short.cardWidth && short.railWidth < short.cardWidth);
+    const railHeight = 4 * (short.railWidth * 14 / 9) + 3 * short.gap;
+    assert.ok(Math.abs(railHeight - shortHeight) < .000001);
+
+    const scrolling = boardLayout(mode, shortWidth, 100, sideProfile);
+    assert.equal(scrolling.fits, false);
+    assert.ok(scrolling.overflow > 0);
+    assert.ok(scrolling.cardWidth >= 40);
+    assert.equal(scrolling.railWidth, .64 * scrolling.cardWidth);
+  });
+}
