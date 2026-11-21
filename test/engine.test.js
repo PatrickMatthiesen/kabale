@@ -117,6 +117,19 @@ test('FreeCell auto move can uncover a foundation card and ignores equivalent co
   assert.equal(applyMove(g,'found:0','cell:0'),true);
 });
 
+test('FreeCell auto move prefers an empty column for a king that covers another card', () => {
+  const g = deal('freecell');
+  const two = freeCard(2,'♣');
+  const king = freeCard(13,'♠');
+  g.cols = [[two,king],[],[]];
+
+  assert.equal(autoMove(g,'col:0:1'),true);
+  assert.deepEqual(g.cols,[[two],[king],[]]);
+  assert.deepEqual(g.cells,[null,null,null,null]);
+  assert.equal(autoMove(g,'col:1:0'),false);
+  assert.equal(g.moves,1);
+});
+
 test('FreeCell counts temporary columns without counting the destination', () => {
   const g = deal('freecell','hard');
   const run = [freeCard(11,'♠'),freeCard(10,'♥'),freeCard(9,'♣')];
