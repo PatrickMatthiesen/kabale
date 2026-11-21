@@ -46,6 +46,7 @@ if (g.mode === 'klondike') emptyColumns = g.emptyColumns ?? 'kings';
 restoreStockMemory([...past,g,...future.slice().reverse()]);
 let hintPositions = new Set([...past,g].map(hintVisitKey));
 const board = $('board');
+const feedback = $('hint-feedback');
 const motion = createCardMotion(board);
 let finishPlayback = null;
 let celebrating = false;
@@ -66,13 +67,10 @@ function fitBoard() {
   const pixels = value => parseFloat(value) || 0;
   const width = board.clientWidth - pixels(style.paddingLeft) - pixels(style.paddingRight);
   const boardTop = board.getBoundingClientRect().top + window.scrollY;
-  const feedback = $('hint-feedback');
-  const feedbackHeight = feedback.hidden ? 0
-    : (feedback.getBoundingClientRect().height || 0) + pixels(getComputedStyle(feedback).marginTop);
-  const below = feedbackHeight + pixels(getComputedStyle(document.body).paddingBottom)
+  const below = pixels(getComputedStyle(document.body).paddingBottom)
     + pixels(getComputedStyle($('table-main')).paddingBottom)
     + pixels(getComputedStyle($('game-room')).borderBottomWidth);
-  const minimumHeight = !feedback.hidden || document.documentElement?.hasAttribute('data-focus-mode') ? 0 : 180;
+  const minimumHeight = document.documentElement?.hasAttribute('data-focus-mode') ? 0 : 180;
   const boardHeight = Math.max(minimumHeight,Math.floor(window.innerHeight - boardTop - below));
   const availableHeight = boardHeight - pixels(style.paddingTop) - pixels(style.paddingBottom)
     - pixels(style.borderTopWidth) - pixels(style.borderBottomWidth);
@@ -105,11 +103,15 @@ function fitBoard() {
   }
   refreshArtResolution();
 }
-new ResizeObserver(() => fitBoard()).observe(board);
+new ResizeObserver(() => {
+  fitBoard();
+  placeFeedback();
+}).observe(board);
 window.addEventListener('resize', () => {
   fitBoard();
   if (finishPlayback) finishPlayback(false);
   else motion.cancel();
+  placeFeedback();
 });
 const rank = c => ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'][c.r];
 const suitNames = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs' };
@@ -122,7 +124,6 @@ function saveNow() {
     hintFeedback = '';
     $('message').textContent = notice;
     renderFeedback();
-    fitBoard();
   }
 }
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 120); }
@@ -262,30 +263,53 @@ function render(newWin = false) {
   renderBoard(g);
   $('message').textContent = g.won ? tr('The table is cleared. Well played.')
     : notice || tr(selected ? 'Choose a destination. Escape cancels your selection.' : 'Drag a card, or select it and its destination.');
-  renderFeedback();
   if (focusKey) board.querySelector(`button[data-key="${focusKey}"]:not(:disabled)`)?.focus({preventScroll:true});
   updateEndgame(newWin);
   fitBoard();
+  renderFeedback();
 }
 function renderFeedback() {
-  const feedback = hintFeedback || notice;
-  $('message').setAttribute('aria-live',feedback ? 'off' : 'polite');
-  $('hint-feedback').hidden = !feedback;
-  $('hint-feedback').dataset.hint = String(Boolean(hintFeedback));
-  $('hint-feedback-text').textContent = feedback;
+  const text = hintFeedback || notice;
+  $('message').setAttribute('aria-live',text ? 'off' : 'polite');
+  feedback.hidden = !text;
+  feedback.dataset.hint = String(Boolean(hintFeedback));
+  $('hint-feedback-text').textContent = text;
+  placeFeedback();
+}
+function hintCardBounds(card) {
+  const {left,right,top,bottom} = card.getBoundingClientRect();
+  const next = card.nextElementSibling;
+  return {left,right,top,bottom:next?.matches('.card') ? Math.min(bottom,next.getBoundingClientRect().top) : bottom};
+}
+function placeFeedback() {
+  if (feedback.hidden) return;
+  const marked = hint
+    ? Array.from(board.querySelectorAll('.hint-source, .hint-destination'),hintCardBounds)
+    : [];
+  if (!marked.length) {
+    feedback.dataset.corner = 'bottom-right';
+    return;
+  }
+  const bounds = board.getBoundingClientRect();
+  for (const corner of ['bottom-right','bottom-left','top-right','top-left']) {
+    feedback.dataset.corner = corner;
+    const toast = feedback.getBoundingClientRect();
+    // Only the part of each mark inside the scrollable board can overlap the toast.
+    if (marked.every(card =>
+      Math.max(card.left,bounds.left,toast.left) >= Math.min(card.right,bounds.right,toast.right) ||
+      Math.max(card.top,bounds.top,toast.top) >= Math.min(card.bottom,bounds.bottom,toast.bottom))) return;
+  }
+  feedback.dataset.corner = 'bottom-right';
 }
 function revealHintSource() {
   if (!(board.scrollHeight > board.clientHeight)) return;
   const source = board.querySelector('.hint-source');
   if (!source) return;
   const target = board.querySelector('.hint-destination');
-  const sourceBox = source.getBoundingClientRect();
-  const nextCard = source.nextElementSibling;
-  const sourceBottom = nextCard?.matches('.card')
-    ? Math.min(sourceBox.bottom,nextCard.getBoundingClientRect().top) : sourceBox.bottom;
+  const sourceBox = hintCardBounds(source);
   const targetBox = target?.getBoundingClientRect();
   let top = sourceBox.top;
-  let bottom = sourceBottom;
+  let bottom = sourceBox.bottom;
   if (targetBox && Math.max(bottom,targetBox.bottom) - Math.min(top,targetBox.top) <= board.clientHeight) {
     top = Math.min(top,targetBox.top);
     bottom = Math.max(bottom,targetBox.bottom);
@@ -294,7 +318,9 @@ function revealHintSource() {
   const viewportBottom = viewportTop + board.clientHeight;
   if (top < viewportTop) board.scrollTop += top - viewportTop;
   else if (bottom > viewportBottom) board.scrollTop += Math.min(top - viewportTop,bottom - viewportBottom);
+  placeFeedback();
 }
+board.addEventListener('scroll',placeFeedback,{passive:true});
 function updateEndgame(newWin = false) {
   endgameUI?.update(g,{canUndo:past.length>0,time:$('time').textContent,deferResult:celebrating,newWin,language});
 }
@@ -351,6 +377,7 @@ function action(fn, finishPlan = null) {
   if (g.difficulty !== 'hard') { past.push(before); if (past.length > 100) past.shift(); }
   if (g.difficulty !== 'hard') hintPositions.add(hintVisitKey(g));
   future = []; selected = null; hint = null; notice = '';
+  if (g.mode === 'freecell') lastClick = {key:'',time:0};
   if (g.won) elapsed += Date.now() - resumedAt;
   updateClock(); save();
   if (g.won) {
@@ -370,6 +397,10 @@ function choose(key, automatic = false) {
       notice=tr('Fill every empty column before dealing from the stock.'); render(); return;
     }
     action(() => applyMove(g,'stock','stock')); return;
+  }
+  if (g.mode === 'freecell' && selected && key !== selected && key?.startsWith('cell:')) {
+    if (!action(() => applyMove(g,selected,key))) lastClick = {key:'',time:0};
+    return;
   }
   if (automatic) { action(() => autoMove(g,key)); return; }
   if (g.mode === 'pyramid' && legalMoves(g).some(m => m.from === key && m.to === key)) { action(() => applyMove(g,key,key)); return; }
@@ -488,8 +519,13 @@ $('settings-open').onclick = () => $('settings-dialog').showModal();
 
 cardDrag = attachCardDrag(board, {
   getMoves: () => g.won ? [] : legalMoves(g),
+  canLift: (from,targets) => {
+    if (targets.size || g.mode !== 'freecell' || !from.startsWith('col:')) return true;
+    const [,column,index]=from.split(':');
+    return Number(index) === g.cols[column].length - 1;
+  },
   onStart: () => {
-    hintFeedback=''; $('hint-feedback').hidden=true;
+    hintFeedback=''; feedback.hidden=true;
     $('message').setAttribute('aria-live','polite');
     hint=null; selected=null; lastClick={key:'',time:0};
     board.querySelectorAll('.hinted,.hint-source,.hint-destination,.selected').forEach(el=>el.classList.remove('hinted','hint-source','hint-destination','selected'));
@@ -502,7 +538,6 @@ cardDrag = attachCardDrag(board, {
   onCancel: () => {
     notice=tr('Move cancelled.');
     $('message').textContent=notice;
-    fitBoard();
   }
 });
 document.addEventListener('keydown', e => {
@@ -525,6 +560,7 @@ document.addEventListener('pointerdown', () => {
 window.addEventListener('scroll', () => {
   if (finishPlayback) finishPlayback(false);
   else motion.cancel();
+  placeFeedback();
 },{passive:true});
 function updateClock(){ const seconds=Math.floor(clock()/1000); $('time').textContent=`${Math.floor(seconds/60).toString().padStart(2,'0')}:${(seconds%60).toString().padStart(2,'0')}`; }
 endgameUI=attachEndgameUI({
@@ -545,6 +581,7 @@ const fullscreen = document.documentElement ? attachFullscreen(document.document
   cardDrag?.cancel();
   motion.cancel();
   fitBoard();
+  placeFeedback();
 },tr) : null;
 applyLanguage();
 document.documentElement?.style.setProperty('--card-index-scale',cardIndexScales[indexSize]);

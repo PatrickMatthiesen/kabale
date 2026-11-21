@@ -69,8 +69,36 @@
 /* Keep recovery choices near the table without treating missing hints as a loss. */
 #end-dialog [hidden]{display:none}
 #end-dialog{max-height:calc(100svh - 24px);overflow:auto}#end-dialog::backdrop{background:#06140f66;backdrop-filter:blur(1px)}#end-dialog .dialog-card{padding:28px}#end-dialog h2{padding-right:16px}#end-dialog .end-stats{color:var(--gold);font:18px Georgia,serif}.end-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:22px}.end-buttons .tool-button{width:auto;min-height:44px;height:auto;padding:10px;border-color:#d9c48a40;font-size:14px;white-space:normal}.end-buttons .primary{color:#2f382a}.win-mark{display:none;width:68px;height:68px;margin:0 auto 18px;border:1px solid #d9bc7c80;border-radius:50%;background:#d9bc7c12;color:var(--gold)}.win-mark svg{width:44px;height:44px;fill:#173d31;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}#end-dialog[data-outcome="won"] .win-mark{display:grid;place-items:center;animation:win-arrive .35s ease-out}#end-dialog[data-outcome="won"] h2,#end-dialog[data-outcome="won"] p{text-align:center}@keyframes win-arrive{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}@media(max-width:720px){#end-dialog{width:calc(100% - 16px);margin:auto auto max(8px,env(safe-area-inset-bottom));border-radius:18px}#end-dialog .dialog-card{padding:24px 20px}}
-/* Keep feedback in its own row so every card remains clickable. */
-.hint-feedback{width:max-content;max-width:min(640px,100%);margin:6px auto 0;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 14px;border:1px solid #d8c58b55;border-radius:14px;background:#12372f;color:#f1ead8;box-shadow:0 4px 18px #061b154d;font:500 clamp(14px,calc(12px + .3vw),18px)/1.45 'Segoe UI',sans-serif}.hint-feedback[hidden]{display:none}.hint-feedback>.hint-symbol{flex:0 0 20px;width:20px;height:20px;fill:none;stroke:#85ddd2;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.hint-feedback>span{min-width:0;overflow-wrap:break-word}.hint-feedback>button{flex:0 0 36px;width:36px;height:36px;padding:8px;border:0;border-radius:50%;background:transparent;color:#c5d4c6;cursor:pointer}.hint-feedback>button:hover{background:#ffffff0b;color:#fff4d8}.hint-feedback>button svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.hint-feedback {
+  --toast-left: max(12px, env(safe-area-inset-left));
+  --toast-right: max(12px, env(safe-area-inset-right));
+  position: fixed;
+  z-index: 10;
+  right: var(--toast-right);
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: max-content;
+  max-width: min(420px, calc(100% - var(--toast-left) - var(--toast-right)));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid #d8c58b55;
+  border-radius: 14px;
+  background: #12372f;
+  color: #f1ead8;
+  box-shadow: 0 4px 18px #061b154d;
+  font: 500 clamp(14px, calc(12px + .3vw), 18px)/1.45 'Segoe UI', sans-serif;
+  pointer-events: none;
+}
+.hint-feedback:is([data-corner="bottom-left"], [data-corner="top-left"]) {
+  left: var(--toast-left);
+  right: auto;
+}
+.hint-feedback:is([data-corner="top-right"], [data-corner="top-left"]) {
+  top: max(12px, env(safe-area-inset-top));
+  bottom: auto;
+}
+.hint-feedback[hidden]{display:none}.hint-feedback>.hint-symbol{flex:0 0 20px;width:20px;height:20px;fill:none;stroke:#85ddd2;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.hint-feedback>span{min-width:0;overflow-wrap:break-word}.hint-feedback>button{flex:0 0 36px;width:36px;height:36px;padding:8px;border:0;border-radius:50%;background:transparent;color:#c5d4c6;cursor:pointer;pointer-events:auto}.hint-feedback>button:hover{background:#ffffff0b;color:#fff4d8}.hint-feedback>button svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
 /* Keep hint marks above the art and within the exposed edge of stacked cards. */
 .hint-source { --hint-accent: #77e4c7; --hint-edge: solid; }
 .hint-destination { --hint-accent: #bfc7ff; --hint-edge: dashed; }
@@ -199,6 +227,19 @@
   flex-direction: column;
 }
 #board[data-side-reserves="true"] .reserve-group > .pile { flex: none; }
+#board[data-mode="freecell"][data-side-reserves="true"] .reserve-group > .pile.drop-target { outline: none; }
+#board[data-mode="freecell"][data-side-reserves="true"] .reserve-group > .pile.drop-target::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 2px dashed #85ddd2;
+  border-radius: inherit;
+  pointer-events: none;
+}
+#board[data-mode="freecell"][data-side-reserves="true"] .reserve-group > .pile.drop-hover::after {
+  border: 3px solid #b8f6db;
+}
 #board[data-side-reserves="true"] .reserve-start { grid-area: start; }
 #board[data-side-reserves="true"] .reserve-end { grid-area: end; }
 #board[data-side-reserves="true"] .tableau { grid-area: tableau; }

@@ -21,23 +21,72 @@ const c=(r,s='♠')=>({r,s,id:`${s}${r}`,up:true});
 function board(difficulty='normal') {
   const g=engine.deal('klondike',difficulty);g.cols=[[c(7)],[],[],[],[],[],[]];g.stock=[];g.waste=[];g.moves=12;return g;
 }
+function eventTarget() {
+  const handlers=new Map();
+  return {
+    addEventListener(type,handler,capture) {
+      const listeners=handlers.get(type)??[];
+      if (capture===true) listeners.unshift(handler);
+      else listeners.push(handler);
+      handlers.set(type,listeners);
+    },
+    emit(type,event) {
+      let stopped=false;
+      event.stopImmediatePropagation=()=>{stopped=true;};
+      for (const listener of handlers.get(type)??[]) {
+        listener(event);
+        if (stopped) break;
+      }
+    }
+  };
+}
 function app(game,stored=new Map(),motionFactory=createCardMotion) {
   if(game)stored.set('kabale-session-v3',JSON.stringify({version:3,game,initial:game,past:[],future:[],elapsed:120000}));
   const elements=new Map();
-  const document={activeElement:null,addEventListener(){},body:{classList:{add(){},remove(){}},append(){}},querySelector:()=>[...elements.values()].find(e=>e.open)??null};
+  let preview, pointerTarget, clickTime=0;
+  const document={activeElement:null,addEventListener(){},
+    body:{classList:{add(){},remove(){}},append(element){preview=element;}},
+    elementFromPoint:()=>pointerTarget,querySelector:()=>[...elements.values()].find(e=>e.open)??null};
   function el(id='') {
-    return {id,dataset:{},open:false,hidden:false,disabled:false,style:{setProperty(){}},classList:{toggle(){},add(){},remove(){}},ownerDocument:document,
-      clientWidth:600,querySelectorAll:()=>[],querySelector:()=>null,getBoundingClientRect:()=>({top:0}),replaceChildren(){},addEventListener(){},focus(){},setAttribute(name,value){this[name]=value;},
+    return {...eventTarget(),id,dataset:{},open:false,hidden:false,disabled:false,style:{setProperty(){}},classList:{toggle(){},add(){},remove(){}},ownerDocument:document,
+      clientWidth:600,querySelectorAll:()=>[],querySelector:()=>null,getBoundingClientRect:()=>({left:0,top:0,width:60,height:90}),replaceChildren(){},focus(){},setAttribute(name,value){this[name]=value;},
       showModal(){this.open=true;},close(){this.open=false;}};
   }
   document.getElementById=id=>{if(!elements.has(id))elements.set(id,el(id));return elements.get(id);};
-  document.createElement=()=>el();
+  document.createElement=()=>({...el(),children:[],append(child){this.children.push(child);},remove(){if(preview===this) preview=undefined;}});
+  const window={...eventTarget(),localStorage:{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v)},devicePixelRatio:1,innerHeight:1000,scrollY:0};
   const context={...engine,...art,...hints,...settings,...i18n,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,planKlondikeHint,rememberStock,restoreStockMemory,createCardMotion:motionFactory,document,
-    window:{localStorage:{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v)},devicePixelRatio:1,innerHeight:1000,scrollY:0,addEventListener(){}},
+    window,performance:{now:()=>clickTime+=100},
     getComputedStyle:()=>({paddingLeft:'8px',paddingRight:'8px'}),ResizeObserver:class{observe(){}},confirm:()=>true,
     setTimeout:()=>1,clearTimeout(){},setInterval(){},Date,console,structuredClone};
   vm.runInNewContext(dragSource+'\n'+source+';globalThis.api={state:()=>g,past:()=>past,choose,flush:saveNow};',context);
-  return {get:id=>document.getElementById(id),api:context.api,stored};
+  function click(key) {
+    const target={dataset:{key},closest:()=>target};
+    document.getElementById('board').emit('click',{target,detail:1});
+  }
+  function startTouch(column,index,destination) {
+    const board=document.getElementById('board');
+    const pile={querySelectorAll:()=>cards};
+    const cardAt=key=>({...el(),dataset:{key},
+      closest(selector){return selector==='.col'?pile:this;},
+      cloneNode:()=>({...el(),removeAttribute(){}})});
+    const cards=context.api.state().cols[column].map((_,i)=>cardAt('col:'+column+':'+i));
+    const target=cards[index];
+    pointerTarget=cardAt('col:'+destination);
+    board.contains=element=>element===pointerTarget;
+    const pointer={pointerId:1,pointerType:'touch',isPrimary:true,button:0,clientX:20,clientY:20,target,preventDefault(){this.defaultPrevented=true;}};
+    board.emit('pointerdown',pointer);
+    return {
+      move(distance){window.emit('pointermove',{...pointer,clientY:pointer.clientY+distance});},
+      release(distance){window.emit('pointerup',{...pointer,clientY:pointer.clientY+distance});},
+      click(){
+        const event={...pointer,detail:1};
+        board.emit('click',event);
+        return Boolean(event.defaultPrevented);
+      }
+    };
+  }
+  return {get:id=>document.getElementById(id),api:context.api,stored,click,startTouch,preview:()=>preview,window};
 }
 
 test('real app finishes, saves final time/moves, and can undo the complete cleanup',()=>{
@@ -153,6 +202,151 @@ test('a stock recycle hint marks the empty Redeal pile and explains its action',
   assert.match(h.get('hint-feedback-text').textContent,/Recycle the waste into the stock.*known waste card/);
   assert.match(h.get('board').innerHTML,/class="pile hinted hint-source" data-key="stock"/);
   assert.equal(h.get('end-dialog').open,false);
+});
+
+test('Pyramid reveals the hinted stock and moves a colliding toast without resizing the board',()=>{
+  const g=engine.deal('pyramid');
+  g.cols=g.cols.map(row=>row.map(card=>({...card,r:2})));
+  g.stock=[{...c(3,'♣'),up:false}];
+  const h=app(g);
+  const table=h.get('board'), toast=h.get('hint-feedback');
+  const layout={};
+  table.style.setProperty=(name,value)=>{layout[name]=value;};
+  const rect=(left,top,width,height)=>({left,top,width,height,right:left+width,bottom:top+height});
+  table.getBoundingClientRect=()=>rect(0,80,600,parseFloat(layout['--table-height']));
+  Object.assign(table,{clientTop:1,clientHeight:178,scrollHeight:260,scrollTop:0});
+  const stock={getBoundingClientRect:()=>rect(260,264-table.scrollTop,40,62)};
+  table.querySelector=selector=>selector==='.hint-source' ? stock : null;
+  table.querySelectorAll=selector=>selector==='.hint-source, .hint-destination' ? [stock] : [];
+  toast.getBoundingClientRect=()=>rect(toast.dataset.corner.endsWith('right') ? h.window.innerWidth-332 : 12,
+    toast.dataset.corner.startsWith('bottom') ? h.window.innerHeight-66 : 12,320,54);
+
+  Object.assign(h.window,{innerWidth:600,innerHeight:240});
+  h.window.emit('resize',{});
+  const before={...layout};
+  h.get('hint').onclick();
+
+  assert.equal(h.get('hint-feedback-text').textContent,'Draw from the stock.');
+  assert.match(table.innerHTML,/hint-source[^>]*data-key="stock"[^>]*>/);
+  assert.equal(table.scrollTop,67);
+  const stockBox=stock.getBoundingClientRect();
+  assert.ok(stockBox.top+stockBox.height/2 < h.window.innerHeight);
+  assert.deepEqual(layout,before);
+  assert.equal(toast.dataset.corner,'top-right');
+  assert.ok(toast.getBoundingClientRect().bottom <= stockBox.top);
+
+  table.scrollTop=0;
+  table.emit('scroll',{});
+  assert.equal(toast.dataset.corner,'bottom-right');
+  table.scrollTop=67;
+  table.emit('scroll',{});
+  assert.equal(toast.dataset.corner,'top-right');
+
+  h.stored.set=()=>{throw new Error('Storage blocked');};
+  h.api.flush();
+  assert.match(h.get('hint-feedback-text').textContent,/storage is unavailable/i);
+  assert.equal(toast.dataset.corner,'top-right');
+  assert.match(table.innerHTML,/hint-source[^>]*data-key="stock"[^>]*>/);
+
+  Object.assign(h.window,{innerWidth:1280,innerHeight:768});
+  h.window.emit('resize',{});
+  assert.equal(toast.dataset.corner,'bottom-right');
+  h.get('hint-feedback-close').onclick();
+  assert.equal(toast.hidden,true);
+});
+
+function freeCellKingRun() {
+  const g=engine.deal('freecell');
+  g.cols=[[c(13),c(12,'♥'),c(11,'♣'),c(10,'♦')],[],[c(3)],[c(4,'♥')],[c(5)],[c(6)],[c(7)],[c(8)]];
+  g.cells=[null,null,c(2),c(2,'♥')];
+  return g;
+}
+
+test('FreeCell starts a new double-click after placing a card in a free cell',()=>{
+  const g=engine.deal('freecell');
+  g.cols=[[c(1)],[],[],[],[],[],[],[]];
+  const h=app(g);
+
+  h.click('col:0:0');
+  h.click('cell:0');
+  assert.equal(h.api.state().moves,1);
+
+  h.click('cell:0');
+  assert.equal(h.api.state().cells[0]?.id,c(1).id);
+  assert.equal(h.api.state().moves,1);
+  assert.match(h.get('board').innerHTML,/data-key="cell:0"[^>]*aria-pressed="true"/);
+
+  h.click('cell:0');
+  assert.equal(h.api.state().cells[0],null);
+  assert.equal(h.api.state().found[0].at(-1)?.id,c(1).id);
+  assert.equal(h.api.state().moves,2);
+});
+
+test('FreeCell keeps the selected stack after repeated clicks on an occupied free cell',()=>{
+  const g=engine.deal('freecell');
+  g.cols=[[c(7),c(6,'♥')],[c(8,'♥')],[],[],[],[],[],[]];
+  g.cells[0]=c(1);
+  const h=app(g);
+  const rejection='That move is not available. Choose another card or destination.';
+
+  h.click('col:0:0');
+  for (let i=0;i<2;i++) {
+    h.click('cell:0');
+    assert.equal(h.api.state().moves,0);
+    assert.equal(h.get('hint-feedback').hidden,false);
+    assert.equal(h.get('hint-feedback-text').textContent,rejection);
+    assert.match(h.get('board').innerHTML,/data-key="col:0:0"[^>]*aria-pressed="true"/);
+  }
+
+  h.click('col:1:0');
+  assert.deepEqual(Array.from(h.api.state().cols[1],card=>card.r),[8,7,6]);
+  assert.equal(h.api.state().moves,1);
+
+  h.click('cell:0');
+  assert.match(h.get('board').innerHTML,/data-key="cell:0"[^>]*aria-pressed="true"/);
+  h.click('cell:0');
+  assert.equal(h.api.state().cells[0],null);
+  assert.equal(h.api.state().found[0].at(-1)?.id,c(1).id);
+  assert.equal(h.api.state().moves,2);
+});
+
+test('FreeCell blocks the four-card king run but lets the player drag the three-card tail',()=>{
+  const h=app(freeCellKingRun());
+  const instruction=h.get('message').textContent;
+  const king=h.startTouch(0,0,1);
+  king.move(12);
+  assert.equal(h.preview(),undefined);
+  king.release(12);
+  assert.equal(king.click(),true);
+  assert.equal(h.get('message').textContent,instruction);
+  assert.equal(h.api.state().moves,0);
+
+  const tap=h.startTouch(0,0,1);
+  tap.move(3);
+  tap.release(3);
+  assert.equal(tap.click(),false);
+  assert.equal(h.get('message').textContent,'There is no legal move for that card.');
+
+  const queen=h.startTouch(0,1,1);
+  queen.move(12);
+  assert.equal(h.preview()?.children.length,3);
+  queen.release(12);
+  assert.equal(h.preview(),undefined);
+  assert.deepEqual(Array.from(h.api.state().cols[0],card=>card.r),[13]);
+  assert.deepEqual(Array.from(h.api.state().cols[1],card=>card.r),[12,11,10]);
+  assert.equal(h.api.state().moves,1);
+});
+
+test('FreeCell can lift the four-card king run with another empty column',()=>{
+  const g=freeCellKingRun();
+  g.cols[2]=[];
+  const h=app(g);
+  const king=h.startTouch(0,0,1);
+  king.move(12);
+  assert.equal(h.preview()?.children.length,4);
+  king.release(12);
+  assert.equal(h.api.state().cols[0].length,0);
+  assert.deepEqual(Array.from(h.api.state().cols[1],card=>card.r),[13,12,11,10]);
 });
 
 test('FreeCell hints name both face-up cards and mark the right handles',()=>{

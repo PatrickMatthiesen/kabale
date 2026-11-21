@@ -1,7 +1,7 @@
 const canonicalTarget = key => key?.startsWith('col:') ? key.split(':').slice(0,2).join(':') : key;
 
 /** Pointer events give mouse, pen and touch the same threshold and drop rules. */
-export function attachCardDrag(board, { getMoves, onStart, onDrop, onCancel }) {
+export function attachCardDrag(board, { getMoves, canLift, onStart, onDrop, onCancel }) {
   let gesture = null, suppressClick = false;
   function cleanup() {
     const previous = gesture;
@@ -19,9 +19,13 @@ export function attachCardDrag(board, { getMoves, onStart, onDrop, onCancel }) {
   }
   function move(event) {
     const drag = gesture;
-    if (!drag || drag.id !== event.pointerId) return;
+    if (!drag || drag.id !== event.pointerId || drag.blocked) return;
     if (!drag.preview) {
       if (Math.hypot(event.clientX-drag.x,event.clientY-drag.y)<8) return;
+      if (canLift?.(drag.from,drag.targets) === false) {
+        drag.blocked=true;
+        return;
+      }
       onStart();
       const rect=drag.element.getBoundingClientRect();
       const preview=document.createElement('div');
@@ -68,9 +72,11 @@ export function attachCardDrag(board, { getMoves, onStart, onDrop, onCancel }) {
     const active=!!drag.preview;
     const target=active&&!cancelled ? hit(event.clientX,event.clientY) : null;
     cleanup();
-    if (!active) return;
+    // A gesture that crossed the threshold can still generate a click when lift was blocked.
+    if (!active && !drag.blocked) return;
     suppressClick=true;
     setTimeout(()=>{suppressClick=false;},0);
+    if (!active) return;
     if (!cancelled) onDrop(drag.from,drag.targets.has(target)?target:null);
     else onCancel?.();
   }
@@ -81,8 +87,6 @@ export function attachCardDrag(board, { getMoves, onStart, onDrop, onCancel }) {
     if (!element || element.disabled || element.dataset.key==='stock') return;
     const from=element.dataset.key;
     const targets=new Set(getMoves().filter(move=>move.from===from).map(move=>canonicalTarget(move.to)));
-    // Picking a card up is independent of whether it has a legal destination.
-    // An empty target set still allows a preview, then returns the card on drop.
     const rect=element.getBoundingClientRect();
     gesture={id:event.pointerId,element,from,targets,x:event.clientX,y:event.clientY,offsetX:event.clientX-rect.left,offsetY:event.clientY-rect.top};
   });

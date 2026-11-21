@@ -6,6 +6,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
+const favicon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"/>';
+
 test('a dependency change versions the published HTML, styles and complete module graph together', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'kabale-build-'));
   const script = fileURLToPath(new URL('../scripts/build-pages.js', import.meta.url));
@@ -18,7 +20,8 @@ test('a dependency change versions the published HTML, styles and complete modul
   try {
     await mkdir(path.join(directory, 'src'));
     await mkdir(path.join(directory, 'assets/cards/optimized'), { recursive: true });
-    await put('index.html', '<link href="src/style.css"><script type="module" src="src/app.js"></script>');
+    await put('index.html', '<link rel="icon" href="./favicon.svg"><link href="src/style.css"><script type="module" src="src/app.js"></script>');
+    await put('favicon.svg', favicon);
     await put('sw.js', '// artwork worker');
     await put('src/app.js', "import { value } from './dependency.js'; import './register-cache.js'; console.log(value);");
     await put('src/dependency.js', "export { value } from './values.js';");
@@ -27,6 +30,8 @@ test('a dependency change versions the published HTML, styles and complete modul
     await put('src/style.css', 'body { margin: 0; }');
     build();
     const firstHtml = await read('index.html');
+    assert.ok(firstHtml.includes('<link rel="icon" href="./favicon.svg">'));
+    assert.equal(await read('favicon.svg'), favicon);
     const firstVersion = firstHtml.match(/app\.js\?v=([a-f0-9]{16})/)[1];
     assert.ok(firstHtml.includes(`style.css?v=${firstVersion}`));
     assert.ok((await read('src/app.js')).includes(`'./dependency.js?v=${firstVersion}'`));
@@ -61,6 +66,7 @@ test('Pages publishes current and retained hashed card artwork', async () => {
     await mkdir(path.join(directory, 'src'));
     await mkdir(path.join(directory, 'assets/cards/optimized'), { recursive: true });
     await writeFile(path.join(directory, 'index.html'), '<script type="module" src="src/app.js"></script>');
+    await writeFile(path.join(directory, 'favicon.svg'), favicon);
     await writeFile(path.join(directory, 'sw.js'), '// artwork worker');
     await writeFile(path.join(directory, 'src/app.js'), '');
     await writeFile(path.join(directory, 'assets/cards/optimized', previousName), await readFile(new URL(previousName, sourceRoot)));
