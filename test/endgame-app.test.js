@@ -1108,6 +1108,37 @@ test('FreeCell keeps the selected stack after repeated clicks on an occupied fre
   assert.equal(h.api.state().moves,2);
 });
 
+test('FreeCell double-click moves a three-card suffix to the first empty column',()=>{
+  const g=freeCellKingRun();
+  g.cells[0]=c(3,'♥');
+  g.cols[2]=[];
+  const h=app(g);
+
+  h.click('col:0:1');
+  assert.equal(h.api.state().moves,0);
+  h.click('col:0:1');
+
+  const state=h.api.state();
+  assert.deepEqual(Array.from(state.cols[0],card=>card.id),[g.cols[0][0].id]);
+  assert.deepEqual(Array.from(state.cols[1],card=>card.id),g.cols[0].slice(1).map(card=>card.id));
+  assert.equal(state.cols[2].length,0);
+  assert.equal(state.moves,1);
+});
+
+test('FreeCell double-click blocks the same suffix when one empty column has insufficient capacity',()=>{
+  const g=freeCellKingRun();
+  g.cells[0]=c(3,'♥');
+  const h=app(g);
+
+  h.click('col:0:1');
+  h.click('col:0:1');
+
+  const state=h.api.state();
+  assert.deepEqual(Array.from(state.cols[0],card=>card.id),g.cols[0].map(card=>card.id));
+  assert.equal(state.cols[1].length,0);
+  assert.equal(state.moves,0);
+});
+
 test('FreeCell blocks the four-card king run but lets the player drag the three-card tail',()=>{
   const h=app(freeCellKingRun());
   const instruction=h.get('message').textContent;
