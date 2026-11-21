@@ -480,8 +480,12 @@ function action(fn, {finishPlan, quiet, drop} = {}) {
 }
 function choose(key, {autoTrigger, cascadeFoundations = false} = {}) {
   if (g.won) return;
-  hintFeedback='';
-  hint = null;
+  const hintedPair = g.mode === 'pyramid' && key !== 'stock' && (hint?.from === key || hint?.to === key) ? hint : null;
+  // Keep the marked pair while the first click selects one of its cards.
+  if (!hintedPair || autoTrigger) {
+    hintFeedback = '';
+    hint = null;
+  }
   announcement = '';
   const attempt = fn => action(fn,{quiet:true});
   if (key === 'stock') {
@@ -493,7 +497,9 @@ function choose(key, {autoTrigger, cascadeFoundations = false} = {}) {
     if (manualFirst && attempt(() => applyMove(g,selected,key))) return;
     if (manualFirst && freeCellTarget) {
       lastClick = {key:'',time:0};
-    } else if (autoTrigger && attempt(() => autoMove(g,key,{cascadeFoundations}))) {
+    } else if (autoTrigger && attempt(() => hintedPair
+      ? applyMove(g,hintedPair.from,hintedPair.to)
+      : autoMove(g,key,{cascadeFoundations}))) {
       return;
     } else if (!autoTrigger && g.mode === 'pyramid' && legalMoves(g).some(m => m.from === key && m.to === key)) {
       if (attempt(() => applyMove(g,key,key))) return;
