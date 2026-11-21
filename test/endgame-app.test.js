@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 import * as engine from '../src/engine.js';
 import * as art from '../src/card-art.js';
 import * as hints from '../src/hints.js';
-import {planKlondikeHint} from '../src/klondike-hints.js';
+import {selectHelpHint} from '../src/help-hint.js';
 import {rememberStock,restoreStockMemory} from '../src/stock-memory.js';
 import * as settings from '../src/game-settings.js';
 import * as i18n from '../src/i18n.js';
@@ -14,6 +14,7 @@ import {boardLayout} from '../src/board-layout.js';
 import {gameRules} from '../src/game-rules.js';
 import {attachEndgameUI} from '../src/endgame-ui.js';
 import {createCardMotion} from '../src/card-motion.js';
+import {cardTransfers} from '../src/card-transfers.js';
 
 const source=(await readFile(new URL('../src/app.js',import.meta.url),'utf8')).replace(/^import .*\r?\n/gm,'');
 const dragSource=(await readFile(new URL('../src/card-drag.js',import.meta.url),'utf8')).replace('export function attachCardDrag','function attachCardDrag');
@@ -49,13 +50,13 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
     elementFromPoint:()=>pointerTarget,querySelector:()=>[...elements.values()].find(e=>e.open)??null};
   function el(id='') {
     return {...eventTarget(),id,dataset:{},open:false,hidden:false,disabled:false,style:{setProperty(){}},classList:{toggle(){},add(){},remove(){}},ownerDocument:document,
-      clientWidth:600,querySelectorAll:()=>[],querySelector:()=>null,getBoundingClientRect:()=>({left:0,top:0,width:60,height:90}),replaceChildren(){},focus(){},setAttribute(name,value){this[name]=value;},
+      clientWidth:600,scrollLeft:0,scrollTop:0,querySelectorAll:()=>[],querySelector:()=>null,getBoundingClientRect:()=>({left:0,top:0,width:60,height:90}),replaceChildren(){},focus(){},setAttribute(name,value){this[name]=value;},
       showModal(){this.open=true;},close(){this.open=false;}};
   }
   document.getElementById=id=>{if(!elements.has(id))elements.set(id,el(id));return elements.get(id);};
   document.createElement=()=>({...el(),children:[],append(child){this.children.push(child);},remove(){if(preview===this) preview=undefined;}});
   const window={...eventTarget(),localStorage:{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v)},devicePixelRatio:1,innerHeight:1000,scrollY:0};
-  const context={...engine,...art,...hints,...settings,...i18n,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,planKlondikeHint,rememberStock,restoreStockMemory,createCardMotion:motionFactory,document,
+  const context={...engine,...art,...hints,...settings,...i18n,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,selectHelpHint,rememberStock,restoreStockMemory,cardTransfers,createCardMotion:motionFactory,document,
     window,performance:{now:()=>clickTime+=100},
     getComputedStyle:()=>({paddingLeft:'8px',paddingRight:'8px'}),ResizeObserver:class{observe(){}},confirm:()=>true,
     setTimeout(callback,delay){timers.set(++nextTimer,{callback,delay});return nextTimer;},
@@ -73,15 +74,16 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
   function click(key,detail=1) {
     document.getElementById('board').emit('click',{target:clickTarget(key),detail});
   }
-  function startTouch(column,index,destination) {
+  function startTouchFrom(key,destination) {
     const board=document.getElementById('board');
     const pile={querySelectorAll:()=>cards};
     const cardAt=key=>({...el(),dataset:{key},
       closest(selector){return selector==='.col'?pile:this;},
       matches:selector=>selector==='.card',
       cloneNode:()=>({...el(),removeAttribute(){}})});
-    const cards=context.api.state().cols[column].map((_,i)=>cardAt('col:'+column+':'+i));
-    const target=cards[index];
+    const [,column,index]=key.split(':');
+    const cards=key.startsWith('col:') ? context.api.state().cols[column].map((_,i)=>cardAt('col:'+column+':'+i)) : [];
+    const target=cards[index] ?? cardAt(key);
     pointerTarget=destination==null ? null : cardAt(destination);
     board.contains=element=>element===pointerTarget;
     const pointer={pointerId:1,pointerType:'touch',isPrimary:true,button:0,clientX:20,clientY:20,target,preventDefault(){this.defaultPrevented=true;}};
@@ -102,8 +104,337 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
     timers.delete(id);
     callback();
   }
-  return {get:id=>document.getElementById(id),api:context.api,stored,click,startTouch,preview:()=>preview,window,document,timers,expireTimer};
+  const startTouch=(column,index,destination)=>startTouchFrom(`col:${column}:${index}`,destination);
+  return {get:id=>document.getElementById(id),api:context.api,stored,click,startTouch,startTouchFrom,preview:()=>preview,window,document,timers,expireTimer};
 }
+
+function motionProbe() {
+  const calls = [];
+  let active = null;
+  const start = kind => {
+    calls.push({kind});
+    return new Promise(resolve=>{active={kind,resolve};});
+  };
+  const cancel = () => {
+    const current = active;
+    active = null;
+    current?.resolve();
+  };
+  return {
+    calls,
+    active:()=>active?.kind,
+    complete:cancel,
+    factory(board,{isEnabled}) {
+      return {
+        enabled:isEnabled,
+        captureTransfers:transfers=>transfers.map(transfer=>({...transfer,markup:board.innerHTML})),
+        move(records,options) {
+          const playback = start('move');
+          Object.assign(calls.at(-1),{records,options,markup:board.innerHTML,moves:board.ownerDocument.getElementById('moves').textContent});
+          return playback;
+        },
+        cancelTransfer:()=>{if (active?.kind === 'move') cancel();},
+        cancel,
+        capture:()=>isEnabled() ? {} : null,
+        deal:()=>start('deal'),
+        win:()=>start('win'),
+        flight:()=>start('flight'),
+      };
+    },
+  };
+}
+
+test('stock movement reads the old board and commits before playback, with exact undo and redo',()=>{
+  const stored = new Map(), sessions = [];
+  const probe = motionProbe();
+  const h = app(engine.deal('klondike'),stored,probe.factory), table = h.get('board');
+  const saveSession = () => {
+    h.api.flush();
+    sessions.push(JSON.parse(stored.get('kabale-session-v3')));
+  };
+  const before = JSON.parse(JSON.stringify(h.api.state()));
+  const markup = table.innerHTML;
+  let rendered = markup;
+  Object.assign(table,{scrollLeft:0,scrollTop:30});
+  Object.defineProperty(table,'innerHTML',{
+    get:()=>rendered,
+    set:value=>{
+      rendered = value;
+      table.scrollTop = Math.min(table.scrollTop,10);
+    },
+  });
+  h.click('stock');
+  saveSession();
+  const committed = sessions[0].game;
+  assert.equal(probe.active(),'move');
+  assert.equal(probe.calls[0].moves,1);
+  assert.equal(probe.calls[0].records[0].markup,markup);
+  assert.match(probe.calls[0].markup,/class="waste-layer waste-top"/);
+  assert.equal(committed.moves,1);
+  assert.deepEqual(sessions[0].past,[before]);
+  assert.deepEqual(sessions[0].future,[]);
+  assert.equal(table.scrollTop,10);
+  table.emit('scroll',{});
+  assert.equal(probe.active(),'move');
+  table.scrollLeft=1;
+  table.emit('scroll',{});
+  assert.equal(probe.active(),undefined);
+
+  h.get('undo').onclick();
+  saveSession();
+  assert.equal(probe.calls[1].records[0].from,'waste');
+  assert.equal(probe.calls[1].records[0].to,'stock');
+  assert.deepEqual(sessions[1].game,before);
+  assert.deepEqual(sessions[1].past,[]);
+  assert.deepEqual(sessions[1].future,[committed]);
+
+  h.get('redo').onclick();
+  saveSession();
+  assert.equal(probe.calls[2].records[0].from,'stock');
+  assert.equal(probe.calls[2].records[0].to,'waste');
+  assert.deepEqual(sessions[2].game,committed);
+  assert.deepEqual(sessions[2].past,[before]);
+  assert.deepEqual(sessions[2].future,[]);
+
+  const key = {key:'Enter',target:{tagName:'DIV',dataset:{key:'stock'}},preventDefault(){this.defaultPrevented=true;}};
+  table.emit('keydown',key);
+  h.document.emit('keydown',key);
+  saveSession();
+  assert.equal(sessions[3].game.moves,2);
+  assert.equal(probe.active(),'move');
+});
+
+test('FreeCell keyboard auto-move animates and touch drag commits without replay',()=>{
+  const probe = motionProbe(), g = freeCellBeforeWin();
+  const h = app(g,new Map(),probe.factory);
+  h.click('col:0:0',0);
+  assert.equal(probe.calls.length,0);
+  h.document.emit('keydown',{key:'a',target:{tagName:'BUTTON'},preventDefault(){}});
+  assert.equal(probe.calls[0].records[0].to,'found:0');
+  assert.equal(h.api.state().moves,g.moves+1);
+
+  const touch = h.startTouch(1,0,'found:1');
+  touch.move(12);
+  touch.release(12);
+  assert.equal(probe.calls.length,1);
+  assert.equal(h.api.state().moves,g.moves+2);
+  assert.equal(h.api.state().found[1].at(-1).r,13);
+});
+
+test('Spider run and Pyramid pair collection play after one committed action each',()=>{
+  const spider = engine.deal('spider');
+  spider.cols[0] = Array.from({length:12},(_,i)=>c(13-i));
+  spider.cols[1] = [c(1)];
+  const spiderProbe = motionProbe(), s = app(spider,new Map(),spiderProbe.factory);
+  setAutoMoveTrigger(s);
+  s.click('col:1:0');
+  assert.equal(spiderProbe.calls[0].moves,1);
+  assert.equal(spiderProbe.calls[0].records.length,13);
+  assert.ok(spiderProbe.calls[0].records.every(record=>record.to==='runs' && !record.arrives));
+  assert.equal(s.api.state().found.length,1);
+
+  const pyramid = engine.deal('pyramid');
+  pyramid.cols = pyramid.cols.map(row=>row.map(()=>null));
+  pyramid.cols[6] = [c(5),c(8,'♥'),c(2),null,null,null,null];
+  const pyramidProbe = motionProbe(), p = app(pyramid,new Map(),pyramidProbe.factory);
+  p.click('p:6:0',0);
+  p.click('p:6:1',0);
+  assert.equal(pyramidProbe.calls[0].moves,1);
+  assert.equal(pyramidProbe.calls[0].records.length,2);
+  assert.ok(pyramidProbe.calls[0].records.every(record=>record.to===null && !record.arrives));
+  assert.equal(p.api.state().removed.length,2);
+});
+
+function spiderBeforeWin() {
+  const g = engine.deal('spider');
+  const runs = Array.from({length:8},(_,i)=>Array.from({length:13},(_,j)=>{
+    const card = c(13-j,i%2 ? '♥' : '♠');
+    return {...card,id:`${i}:${card.id}`};
+  }));
+  g.stock = [];
+  g.found = runs.slice(0,6);
+  g.cols = [runs[6].slice(0,10),runs[6].slice(10),runs[7].slice(0,10),runs[7].slice(10),[],[],[],[],[],[]];
+  return g;
+}
+
+test('Spider Finish captures each old board and animates all thirteen cards to the updated counter',async()=>{
+  const g = spiderBeforeWin(), probe = motionProbe(), h = app(g,new Map(),probe.factory);
+  const table = h.get('board'), before = table.innerHTML;
+  assert.equal(h.get('finish-game').hidden,false);
+  h.get('finish-game').onclick();
+  h.api.flush();
+  assert.equal(JSON.parse(h.stored.get('kabale-session-v3')).game.won,true);
+  assert.equal(h.get('game-room').inert,true);
+  assert.equal(h.get('end-dialog').open,false);
+
+  const first = probe.calls[0];
+  assert.equal(first.kind,'move');
+  assert.equal(first.records.length,13);
+  assert.equal(new Set(first.records.map(record=>record.from)).size,13);
+  assert.ok(first.records.every(record=>record.to==='runs' && !record.arrives && record.markup===before));
+  assert.match(first.markup,/class="run-counter">7<small>/);
+  assert.doesNotMatch(first.markup,/data-key="col:0:0"/);
+  table.emit('scroll',{});
+  assert.equal(probe.calls.length,1);
+  assert.equal(probe.active(),'move');
+
+  probe.complete();
+  await new Promise(resolve=>setImmediate(resolve));
+  const second = probe.calls[1];
+  assert.equal(second.kind,'move');
+  assert.equal(second.records.length,13);
+  assert.ok(second.records.every(record=>record.to==='runs' && !record.arrives && record.markup===first.markup));
+  assert.match(second.markup,/class="run-counter">8<small>/);
+  assert.ok(first.options.duration > 0 && second.options.duration > 0);
+  assert.ok(first.options.duration + second.options.duration <= 1600);
+  probe.complete();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(probe.calls.map(call=>call.kind),['move','move','win']);
+  assert.equal(h.get('game-room').inert,false);
+});
+
+test('Skip cancels the pending Spider transfer and displays the saved win immediately',async()=>{
+  const probe = motionProbe(), h = app(spiderBeforeWin(),new Map(),probe.factory);
+  h.get('finish-game').onclick();
+  assert.equal(probe.active(),'move');
+  h.get('skip-finish').onclick();
+  assert.equal(probe.active(),undefined);
+  assert.equal(h.get('skip-finish').hidden,true);
+  assert.equal(h.get('end-dialog').open,true);
+  assert.match(h.get('board').innerHTML,/class="run-counter">8<small>/);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(probe.calls.map(call=>call.kind),['move']);
+
+  const offProbe = motionProbe(), off = app(spiderBeforeWin(),new Map(),offProbe.factory);
+  const setting = off.get('card-animations');
+  setting.value='off';
+  setting.onchange({target:setting});
+  off.get('finish-game').onclick();
+  assert.equal(off.api.state().won,true);
+  assert.equal(off.get('end-dialog').open,true);
+  assert.deepEqual(offProbe.calls,[]);
+});
+
+test('Spider drag animates only the stationary destination cards, including on the final run',async()=>{
+  const g = spiderBeforeWin(), probe = motionProbe(), h = app(g,new Map(),probe.factory);
+  const first = h.startTouch(1,0,'col:0');
+  first.move(12);
+  assert.equal(h.preview().children.length,3);
+  first.release(12);
+  assert.equal(h.preview(),undefined);
+  assert.equal(h.api.state().won,false);
+  assert.deepEqual(probe.calls[0].records.map(record=>record.from),Array.from({length:10},(_,i)=>`col:0:${i}`));
+  assert.ok(probe.calls[0].records.every(record=>record.to==='runs' && !record.arrives));
+
+  const last = h.startTouch(3,0,'col:2');
+  last.move(12);
+  last.release(12);
+  assert.equal(h.api.state().won,true);
+  assert.equal(h.api.state().moves,g.moves+2);
+  assert.equal(h.get('end-dialog').open,false);
+  assert.deepEqual(probe.calls[1].records.map(record=>record.from),Array.from({length:10},(_,i)=>`col:2:${i}`));
+  assert.ok(probe.calls[1].records.every(record=>record.to==='runs' && !record.arrives));
+  probe.complete();
+  await Promise.resolve();
+  assert.deepEqual(probe.calls.map(call=>call.kind),['move','move','win']);
+});
+
+test('Pyramid drag fades only the stationary partner before the win celebration',async()=>{
+  const g = engine.deal('pyramid');
+  g.cols = g.cols.map(row=>row.map(()=>null));
+  g.cols[6][0] = c(5);
+  g.pairWaste = [c(8,'♥')];
+  const probe = motionProbe(), h = app(g,new Map(),probe.factory);
+  const touch = h.startTouchFrom('p:6:0','pw');
+  touch.move(12);
+  touch.release(12);
+  assert.equal(h.preview(),undefined);
+  assert.equal(h.api.state().won,true);
+  assert.equal(h.api.state().removed.length,2);
+  assert.equal(h.get('end-dialog').open,false);
+  assert.equal(probe.active(),'move');
+  assert.equal(probe.calls[0].records.length,1);
+  const [partner] = probe.calls[0].records;
+  assert.equal(partner.from,'pw');
+  assert.equal(partner.to,null);
+  assert.equal(partner.arrives,false);
+  assert.match(partner.markup,/data-key="pw"/);
+  assert.doesNotMatch(probe.calls[0].markup,/data-key="p:6:0"/);
+  probe.complete();
+  await Promise.resolve();
+  assert.deepEqual(probe.calls.map(call=>call.kind),['move','win']);
+});
+
+test('Card animations is localized, cancels playback when switched off, and stays off after reload',async()=>{
+  const html = await readFile(new URL('../index.html',import.meta.url),'utf8');
+  const cardsSettings = html.split('<legend data-i18n>Cards</legend>')[1].split('</fieldset>')[0];
+  assert.match(cardsSettings,/<span data-i18n>Card animations<\/span>\s*<select id="card-animations">/);
+  assert.equal(i18n.translate('da','Card animations'),'Kortanimationer');
+  const probe = motionProbe(), h = app(engine.deal('klondike'),new Map(),probe.factory);
+  const setting = h.get('card-animations');
+  assert.equal(setting.value,'on');
+  h.click('stock');
+  assert.equal(probe.active(),'move');
+  setting.value='off';
+  setting.onchange({target:setting});
+  assert.equal(probe.active(),undefined);
+  h.api.flush();
+  const restored = app(null,h.stored,probe.factory);
+  assert.equal(restored.get('card-animations').value,'off');
+  restored.click('stock');
+  assert.equal(restored.api.state().moves,2);
+  restored.get('new').onclick();
+  assert.equal(restored.api.state().moves,0);
+  assert.equal(probe.calls.length,1);
+});
+
+test('board scroll preserves the win celebration and switching animations off reveals the result',async()=>{
+  const g = engine.deal('pyramid');
+  g.cols = g.cols.map(row=>row.map(()=>null));
+  g.cols[6][0] = c(13);
+  const probe = motionProbe(), h = app(g,new Map(),probe.factory);
+  h.click('p:6:0',0);
+  assert.equal(h.api.state().won,true);
+  assert.equal(probe.active(),'move');
+  assert.equal(h.get('end-dialog').open,false);
+  const table = h.get('board');
+  table.emit('scroll',{});
+  assert.equal(probe.active(),'move');
+  table.scrollTop=5;
+  table.emit('scroll',{});
+  await Promise.resolve();
+  table.scrollTop=10;
+  table.emit('scroll',{});
+  assert.equal(probe.active(),'win');
+  const setting = h.get('card-animations');
+  setting.value='off';
+  setting.onchange({target:setting});
+  await Promise.resolve();
+  assert.equal(probe.active(),undefined);
+  assert.equal(h.get('end-dialog').open,true);
+  assert.deepEqual(probe.calls.map(call=>call.kind),['move','win']);
+});
+
+test('switching Card animations off ends a pending Finish and skips playback in a saved Off session',()=>{
+  const g = freeCellBeforeWin();
+  const probe = motionProbe(), h = app(g,new Map(),probe.factory);
+  h.get('finish-game').onclick();
+  assert.equal(probe.active(),'flight');
+  assert.equal(h.get('game-room').inert,true);
+  h.get('board').emit('scroll',{});
+  assert.equal(probe.active(),'flight');
+  const setting = h.get('card-animations');
+  setting.value='off';
+  setting.onchange({target:setting});
+  assert.equal(probe.active(),undefined);
+  assert.equal(h.get('game-room').inert,false);
+  assert.equal(h.get('end-dialog').open,true);
+  const restored = app(g,h.stored,probe.factory);
+  restored.get('finish-game').onclick();
+  assert.equal(restored.api.state().won,true);
+  assert.equal(restored.get('end-dialog').open,true);
+  assert.deepEqual(probe.calls.map(call=>call.kind),['flight']);
+});
 
 test('real app finishes, saves final time/moves, and can undo the complete cleanup',()=>{
   const g=board();g.found=['♠','♥','♦','♣'].map(s=>Array.from({length:12},(_,i)=>c(i+1,s)));
@@ -544,7 +875,7 @@ test('the global auto-move trigger defaults to double-click and changes without 
 });
 
 test('a touch below the drag threshold auto-moves only on the click after release',()=>{
-  const h=app(freeCellBeforeWin());
+  const probe=motionProbe(), h=app(freeCellBeforeWin(),new Map(),probe.factory);
   setAutoMoveTrigger(h);
   h.get('freecell-auto-fill-foundations').onchange({target:{value:'off'}});
   const tap=h.startTouch(0,0,'found:0');
@@ -553,7 +884,9 @@ test('a touch below the drag threshold auto-moves only on the click after releas
   assert.equal(h.preview(),undefined);
   tap.release(3);
   assert.equal(h.api.state().moves,48);
+  assert.equal(probe.calls.length,0);
   assert.equal(tap.click(),false);
+  assert.equal(probe.calls[0].records[0].to,'found:0');
   assert.equal(h.api.state().moves,49);
   assert.equal(h.api.state().found[0].at(-1).id,c(13).id);
   assert.equal(h.api.state().cells[0].id,c(13,'♣').id);

@@ -1,16 +1,18 @@
 import { deal, applyMove, autoMove, legalMoves, pyramidPlayable } from './engine.js';
 import { loadArt, saveArt, resolveArt, cardFace, getStorage } from './card-art.js';
 import { wasteLayout } from './waste-layout.js';
-import { hintRole as getHintRole, hintVisitKey, selectHint, visibleHintCard } from './hints.js';
-import { planKlondikeHint } from './klondike-hints.js';
+import { hintRole as getHintRole, hintVisitKey, visibleHintCard } from './hints.js';
+import { selectHelpHint } from './help-hint.js';
 import { rememberStock, restoreStockMemory } from './stock-memory.js';
 import { boardLayout } from './board-layout.js';
 import { attachCardDrag } from './card-drag.js';
 import { loadEmptyColumns, saveEmptyColumns, cardIndexScales, loadCardIndexSize, saveCardIndexSize } from './game-settings.js';
 import { loadFreeCellAutoFill, saveFreeCellAutoFill, loadAutoMoveTrigger, saveAutoMoveTrigger } from './game-settings.js';
+import { loadCardAnimations, saveCardAnimations } from './game-settings.js';
 import { gameRules } from './game-rules.js';
 import { attachEndgameUI } from './endgame-ui.js';
 import { createCardMotion } from './card-motion.js';
+import { cardTransfers } from './card-transfers.js';
 import { attachFullscreen } from './fullscreen.js';
 import { bindDocumentLanguage, loadLanguage, saveLanguage, translate } from './i18n.js';
 import './register-cache.js';
@@ -22,6 +24,7 @@ let emptyColumns = loadEmptyColumns(storage);
 let indexSize = loadCardIndexSize(storage);
 let freeCellAutoFill = loadFreeCellAutoFill(storage);
 let autoMoveTrigger = loadAutoMoveTrigger(storage);
+let cardAnimations = loadCardAnimations(storage);
 let language = loadLanguage(storage,window.navigator?.language);
 const tr = (text,values) => translate(language,text,values);
 const setDocumentLanguage = document.documentElement ? bindDocumentLanguage(document) : null;
@@ -52,9 +55,10 @@ restoreStockMemory([...past,g,...future.slice().reverse()]);
 let hintPositions = new Set([...past,g].map(hintVisitKey));
 const board = $('board');
 const feedback = $('hint-feedback');
-const motion = createCardMotion(board);
+const motion = createCardMotion(board,{isEnabled:()=>cardAnimations === 'on'});
 let finishPlayback = null;
 let celebrating = false;
+let transferScrollLeft, transferScrollTop;
 let cardDrag;
 let cardPixels = 160;
 let lastLayout = '';
@@ -200,7 +204,12 @@ function card(c, key, top = 0, blocked = false) {
 }
 function waste(cards, key) {
   if (!cards.length) return pile('', key, tr('Waste'));
-  return `<div class="pile waste-pile" data-key="${key}">${wasteLayout(cards).map((layer,i) => `<div class="waste-layer ${layer.top ? 'waste-top' : 'waste-ghost'}" style="transform:translate(${layer.x}px,${layer.y}px) rotate(${layer.angle}deg);z-index:${i}" ${layer.top ? '' : 'aria-hidden="true" inert'}>${card(layer.card,key,0,!layer.top)}</div>`).join('')}</div>`;
+  const layers = wasteLayout(cards).map((layer,i) => {
+    const markup = card(layer.card,key,0,!layer.top);
+    const content = layer.top ? markup : markup.replace(` data-key="${key}"`, ` data-motion-key="${key}:layer:${i}"`);
+    return `<div class="waste-layer ${layer.top ? 'waste-top' : 'waste-ghost'}" style="transform:translate(${layer.x}px,${layer.y}px) rotate(${layer.angle}deg);z-index:${i}" ${layer.top ? '' : 'aria-hidden="true" inert'}>${content}</div>`;
+  });
+  return `<div class="pile waste-pile" data-key="${key}">${layers.join('')}</div>`;
 }
 function pile(contents, key, label) {
   const role = !contents ? (key==='stock' && hint?.from===key ? 'hint-source' : hint?.to===key ? 'hint-destination' : '') : '';
@@ -236,14 +245,29 @@ function renderBoard(display) {
   }
   board.innerHTML = html;
 }
-function render(newWin = false) {
+function moveTransfers(records, options) {
+  if (!records?.length) return;
+  // Rendering can clamp scroll and queue an event for these same offsets.
+  transferScrollLeft = board.scrollLeft;
+  transferScrollTop = board.scrollTop;
+  return motion.move(records, options);
+}
+function render({newWin = false, before, drop} = {}) {
   cancelDrag();
+  motion.cancelTransfer?.();
+  let descriptors = before && motion.enabled() ? cardTransfers(before,g) : [];
+  if (drop) descriptors = descriptors.filter(({from,to}) => {
+    if (g.mode === 'spider') return to === 'runs' && from.startsWith(`${drop.to}:`);
+    return g.mode === 'pyramid' && to === null && from === drop.to && from !== drop.from;
+  });
+  const transfers = descriptors.length ? motion.captureTransfers?.(descriptors) : null;
   board.dataset.mode = g.mode;
   fitBoard();
   const focusKey = document.activeElement?.dataset.key;
   board.dataset.art = art.resolved;
   $('card-art').value = art.choice;
   $('card-index-size').value = indexSize;
+  $('card-animations').value = cardAnimations;
   $('art-note').hidden = art.choice !== 'random';
   $('art-note').textContent = art.choice === 'random' ? tr(art.resolved === 'engraved' ? 'Engraved' : 'Woodcut') : '';
   $('modes').innerHTML = Object.entries(names).map(([mode, name]) => `<button type="button" data-mode="${mode}" aria-pressed="${g.mode === mode}" class="${g.mode === mode ? 'active' : ''}">${tr(name)}</button>`).join('');
@@ -273,6 +297,7 @@ function render(newWin = false) {
   fitBoard();
   renderFeedback();
   renderMessage();
+  return moveTransfers(transfers);
 }
 function renderMessage() {
   const text = dragging ? tr('Release to place the card. Escape cancels.')
@@ -357,22 +382,33 @@ function revealHintSource() {
   else if (bottom > viewportBottom) board.scrollTop += Math.min(top - viewportTop,bottom - viewportBottom);
   placeFeedback();
 }
-board.addEventListener('scroll',placeFeedback,{passive:true});
+board.addEventListener('scroll',() => {
+  if (board.scrollLeft !== transferScrollLeft || board.scrollTop !== transferScrollTop) {
+    motion.cancelTransfer?.();
+  }
+  placeFeedback();
+},{passive:true});
 function updateEndgame(newWin = false) {
   endgameUI?.update(g,{canUndo:past.length>0,time:$('time').textContent,deferResult:celebrating,newWin,language});
 }
-function celebrate(previous) {
+function celebrate(previous, {before, drop} = {}) {
   const winner = g;
   celebrating = motion.enabled();
-  render(true);
-  if (celebrating) {
-    const showResult = () => {
-      if (g !== winner) return;
-      celebrating = false;
-      updateEndgame();
-    };
-    motion.win(previous).then(showResult,showResult);
-  }
+  const movement = render({newWin:true,before,drop});
+  if (!celebrating) return;
+
+  const showResult = () => {
+    if (g !== winner) return;
+    celebrating = false;
+    updateEndgame();
+  };
+  const startCelebration = () => {
+    if (g !== winner || !celebrating) return;
+    if (motion.enabled()) motion.win(previous).then(showResult,showResult);
+    else showResult();
+  };
+  if (movement) movement.then(startCelebration,startCelebration);
+  else startCelebration();
 }
 async function playFinish(display, path, previous) {
   $('game-room').inert = true;
@@ -385,17 +421,29 @@ async function playFinish(display, path, previous) {
     $('game-room').inert = false;
     $('skip-finish').hidden = true;
     if (animateWin) celebrate(previous);
-    else render(true);
+    else render({newWin:true});
   };
   finishPlayback = complete;
   const duration = Math.min(150,1600 / path.length);
+  const spider = display.mode === 'spider';
   try {
+    if (spider) motion.cancel();
     for (const {from,to} of path) {
-      const source = board.querySelector(`.card[data-key="${from}"]:not(.waste-ghost .card)`);
-      const target = board.querySelector(`[data-key="${to}"]`);
-      await motion.flight(source,target,{duration});
+      if (spider) {
+        const next = structuredClone(display);
+        if (!applyMove(next,from,to)) { complete(false); return; }
+        const transfers = motion.captureTransfers(cardTransfers(display,next));
+        display = next;
+        renderBoard(display);
+        await moveTransfers(transfers,{duration});
+      } else {
+        const source = board.querySelector(`.card[data-key="${from}"]:not(.waste-ghost .card)`);
+        const target = board.querySelector(`[data-key="${to}"]`);
+        await motion.flight(source,target,{duration});
+      }
       if (finishPlayback !== complete) return;
       if (!motion.enabled()) { complete(false); return; }
+      if (spider) continue;
       if (!applyMove(display,from,to)) break;
       renderBoard(display);
     }
@@ -405,7 +453,7 @@ async function playFinish(display, path, previous) {
     complete(false);
   }
 }
-function action(fn, {finishPlan, quiet} = {}) {
+function action(fn, {finishPlan, quiet, drop} = {}) {
   if (finishPlayback) return false;
   const before = structuredClone(g);
   if (!fn()) {
@@ -426,8 +474,8 @@ function action(fn, {finishPlan, quiet} = {}) {
     cancelDrag();
     const previous = motion.capture();
     if (finishPlan && motion.enabled()) void playFinish(structuredClone(before),finishPlan,previous);
-    else celebrate(previous);
-  } else render();
+    else celebrate(previous,{before,drop});
+  } else render({before,drop});
   return true;
 }
 function choose(key, {autoTrigger, cascadeFoundations = false} = {}) {
@@ -480,9 +528,10 @@ function undo(redo = false) {
   celebrating = false;
   motion.cancel();
   hintFeedback='';
-  elapsed = clock(); to.push(structuredClone(g)); g = from.pop(); selected = null; hint = null; announcement = tr(redo ? 'Move restored.' : 'Move undone.');
+  const before = g;
+  elapsed = clock(); to.push(structuredClone(before)); g = from.pop(); selected = null; hint = null; announcement = tr(redo ? 'Move restored.' : 'Move undone.');
   hintPositions = new Set([...past,g].map(hintVisitKey));
-  resumedAt = Date.now(); save(); render();
+  resumedAt = Date.now(); save(); render({before});
 }
 function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyRule = emptyColumns, animate = false) {
   if (finishPlayback) return false;
@@ -542,6 +591,13 @@ $('card-index-size').onchange = e => {
   document.documentElement?.style.setProperty('--card-index-scale',cardIndexScales[indexSize]);
   render();
 };
+$('card-animations').onchange = e => {
+  cardAnimations = saveCardAnimations(storage,e.target.value);
+  if (cardAnimations === 'off') {
+    if (finishPlayback) finishPlayback(false);
+    else motion.cancel();
+  }
+};
 $('new').onclick = newDeal;
 $('skip-finish').onclick = () => finishPlayback?.(false);
 $('restart').onclick = () => fresh(g.mode,g.difficulty,true);
@@ -552,8 +608,8 @@ $('hint').onclick = () => {
   setWarning('');
   selected=null;
   announcement = '';
-  const plan = g.mode === 'klondike' ? planKlondikeHint(g,g.stockMemory,{visited:hintPositions,maxTimeMs:35}) : null;
-  hint = plan ? plan.move : selectHint(g,hintPositions);
+  const {move,plan} = selectHelpHint(g,hintPositions);
+  hint = move;
   if (!hint) {
     hintFeedback = tr(legalMoves(g).length ? 'No useful continuation found. Try another approach or undo a move.' : 'No legal moves remain from this position.');
   } else if (hint.from === 'stock') {
@@ -606,7 +662,7 @@ cardDrag = attachCardDrag(board, {
   },
   onDrop: (from,to) => {
     dragging = false;
-    if (!to || !action(()=>applyMove(g,from,to),{quiet:true})) render();
+    if (!to || !action(()=>applyMove(g,from,to),{quiet:true,drop:{from,to}})) render();
   },
   onCancel: endDrag
 });
@@ -615,6 +671,7 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); finishPlayback(false); }
     return;
   }
+  if (e.defaultPrevented) return;
   if (!celebrating) motion.cancel();
   if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName) || document.querySelector('dialog[open]')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(e.shiftKey); }

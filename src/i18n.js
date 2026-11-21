@@ -36,6 +36,7 @@ const danish = {
   'Cards': 'Kort',
   'Game': 'Spil',
   'Card art': 'Kortdesign',
+  'Card animations': 'Kortanimationer',
   'High contrast': 'Høj kontrast',
   'Engraved': 'Gravering',
   'Woodcut': 'Træsnit',
