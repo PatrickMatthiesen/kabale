@@ -61,19 +61,28 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
     setTimeout(callback,delay){timers.set(++nextTimer,{callback,delay});return nextTimer;},
     clearTimeout:id=>timers.delete(id),setInterval(){},Date,console,structuredClone};
   vm.runInNewContext(dragSource+'\n'+source+';globalThis.api={state:()=>g,past:()=>past,choose,flush:saveNow};',context);
-  function click(key) {
-    const target={dataset:{key},closest:()=>target};
-    document.getElementById('board').emit('click',{target,detail:1});
+  function clickTarget(key) {
+    const html=document.getElementById('board').innerHTML;
+    const markup=html.match(/<button [^>]+>/g)?.find(button=>button.includes('data-key="'+key+'"'));
+    assert.ok(markup,'Expected a rendered button for '+key);
+    const target={dataset:{key},closest:()=>target,
+      matches:selector=>selector==='.card' && markup.includes('class="card '),
+      disabled:markup.endsWith(' disabled>')};
+    return target;
+  }
+  function click(key,detail=1) {
+    document.getElementById('board').emit('click',{target:clickTarget(key),detail});
   }
   function startTouch(column,index,destination) {
     const board=document.getElementById('board');
     const pile={querySelectorAll:()=>cards};
     const cardAt=key=>({...el(),dataset:{key},
       closest(selector){return selector==='.col'?pile:this;},
+      matches:selector=>selector==='.card',
       cloneNode:()=>({...el(),removeAttribute(){}})});
     const cards=context.api.state().cols[column].map((_,i)=>cardAt('col:'+column+':'+i));
     const target=cards[index];
-    pointerTarget=destination==null ? null : cardAt('col:'+destination);
+    pointerTarget=destination==null ? null : cardAt(destination);
     board.contains=element=>element===pointerTarget;
     const pointer={pointerId:1,pointerType:'touch',isPrimary:true,button:0,clientX:20,clientY:20,target,preventDefault(){this.defaultPrevented=true;}};
     board.emit('pointerdown',pointer);
@@ -81,8 +90,8 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
       move(distance){window.emit('pointermove',{...pointer,clientY:pointer.clientY+distance});},
       release(distance){window.emit('pointerup',{...pointer,clientY:pointer.clientY+distance});},
       cancel(){window.emit('pointercancel',pointer);},
-      click(){
-        const event={...pointer,detail:1};
+      click(key){
+        const event={...pointer,target:key===undefined ? target : clickTarget(key),detail:1};
         board.emit('click',event);
         return Boolean(event.defaultPrevented);
       }
@@ -413,6 +422,276 @@ function freeCellKingRun() {
   return g;
 }
 
+function freeCellBeforeWin() {
+  const g=engine.deal('freecell');
+  const suits=['♠','♥','♦','♣'];
+  g.found=suits.map(suit=>Array.from({length:12},(_,i)=>c(i+1,suit)));
+  g.cols=[[c(13)],[c(13,'♥')],[c(13,'♦')],[],[],[],[],[]];
+  g.cells=[c(13,'♣'),null,null,null];
+  g.moves=48;
+  return g;
+}
+
+test('FreeCell defaults to auto-fill in a saved game and treats the entire win as one action',()=>{
+  const g=freeCellBeforeWin(),h=app(g);
+  assert.equal(h.get('freecell-options').hidden,false);
+  assert.equal(h.get('freecell-auto-fill-foundations').value,'on');
+
+  h.click('col:0:0');
+  assert.equal(h.api.state().moves,48);
+  h.click('col:0:0');
+  const won=structuredClone(h.api.state());
+  assert.equal(won.moves,52);
+  assert.equal(won.won,true);
+  assert.deepEqual(won.found.map(pile=>pile.length),[13,13,13,13]);
+  assert.equal(won.cells[0],null);
+  assert.equal(h.api.past().length,1);
+  assert.equal(h.get('end-dialog').open,true);
+  assert.match(h.get('end-stats').textContent,/52 moves/);
+
+  h.get('end-keep').onclick();
+  h.get('undo').onclick();
+  assert.deepEqual(h.api.state(),g);
+  h.get('redo').onclick();
+  assert.deepEqual(h.api.state(),won);
+});
+
+test('FreeCell auto-fill opt-out persists across reload and can change during a deal',()=>{
+  const h=app(freeCellBeforeWin());
+  const setting=h.get('freecell-auto-fill-foundations');
+  const game=h.api.state();
+  setting.value='off';
+  setting.onchange({target:setting});
+  assert.equal(h.api.state(),game);
+
+  const reloaded=app(null,h.stored);
+  const savedSetting=reloaded.get('freecell-auto-fill-foundations');
+  assert.equal(savedSetting.value,'off');
+  reloaded.click('col:0:0');
+  reloaded.click('col:0:0');
+  assert.equal(reloaded.api.state().moves,49);
+  assert.equal(reloaded.api.state().won,false);
+
+  const inProgress=reloaded.api.state();
+  savedSetting.value='on';
+  savedSetting.onchange({target:savedSetting});
+  assert.equal(reloaded.api.state(),inProgress);
+  assert.equal(reloaded.api.past().length,1);
+  reloaded.click('col:1:0');
+  reloaded.click('col:1:0');
+  assert.equal(reloaded.api.state().moves,52);
+  assert.equal(reloaded.api.state().won,true);
+});
+
+test('FreeCell A key, manual destination and drag each move just one foundation card',()=>{
+  const moveSingleCard = [
+    h=>{
+      h.click('col:0:0',0);
+      h.document.emit('keydown',{key:'a',target:{tagName:'BUTTON'},preventDefault(){}});
+    },
+    h=>{h.click('col:0:0');h.click('found:0');},
+    h=>{
+      const touch=h.startTouch(0,0,'found:0');
+      touch.move(12);
+      touch.release(12);
+    }
+  ];
+  for (const move of moveSingleCard) {
+    const h=app(freeCellBeforeWin());
+    move(h);
+    const state=h.api.state();
+    assert.equal(state.moves,49);
+    assert.equal(state.found[0].at(-1)?.id,c(13).id);
+    assert.deepEqual(Array.from(state.found,pile=>pile.length),[13,12,12,12]);
+  }
+});
+
+test('FreeCell auto-fill requires two pointer clicks on the same card',()=>{
+  const h=app(freeCellBeforeWin());
+  h.click('col:0:0',0);
+  h.click('col:0:0');
+  assert.equal(h.api.state().moves,48);
+  h.click('col:0:0');
+  assert.equal(h.api.state().won,true);
+});
+
+function setAutoMoveTrigger(h,value='single') {
+  const setting=h.get('auto-move-trigger');
+  setting.value=value;
+  setting.onchange({target:setting});
+}
+
+test('the global auto-move trigger defaults to double-click and changes without replacing the deal',()=>{
+  const h=app(freeCellBeforeWin());
+  const game=h.api.state();
+  assert.equal(h.get('auto-move-trigger').value,'double');
+  setAutoMoveTrigger(h);
+  assert.equal(h.api.state(),game);
+  assert.equal(h.api.past().length,0);
+
+  const reloaded=app(null,h.stored);
+  assert.equal(reloaded.get('auto-move-trigger').value,'single');
+  reloaded.click('col:0:0');
+  assert.equal(reloaded.api.state().moves,52);
+  assert.equal(reloaded.api.past().length,1);
+  reloaded.get('end-keep').onclick();
+  reloaded.get('undo').onclick();
+  setAutoMoveTrigger(reloaded,'double');
+  reloaded.click('col:0:0');
+  assert.equal(reloaded.api.state().moves,48);
+  reloaded.click('col:0:0');
+  assert.equal(reloaded.api.state().won,true);
+});
+
+test('a touch below the drag threshold auto-moves only on the click after release',()=>{
+  const h=app(freeCellBeforeWin());
+  setAutoMoveTrigger(h);
+  h.get('freecell-auto-fill-foundations').onchange({target:{value:'off'}});
+  const tap=h.startTouch(0,0,'found:0');
+  assert.equal(h.api.state().moves,48);
+  tap.move(3);
+  assert.equal(h.preview(),undefined);
+  tap.release(3);
+  assert.equal(h.api.state().moves,48);
+  assert.equal(tap.click(),false);
+  assert.equal(h.api.state().moves,49);
+  assert.equal(h.api.state().found[0].at(-1).id,c(13).id);
+  assert.equal(h.api.state().cells[0].id,c(13,'♣').id);
+});
+
+test('single-click auto-move ignores the follow-up click after completed, missed and blocked drags',()=>{
+  const completed=app(freeCellBeforeWin());
+  setAutoMoveTrigger(completed);
+  const drag=completed.startTouch(0,0,'col:3');
+  assert.equal(completed.api.state().moves,48);
+  drag.move(12);
+  assert.ok(completed.preview());
+  assert.equal(completed.api.state().moves,48);
+  drag.release(12);
+  assert.equal(completed.api.state().moves,49);
+  assert.equal(completed.api.state().cols[3].at(-1).id,c(13).id);
+  assert.equal(completed.api.state().found[0].length,12);
+  assert.equal(drag.click('col:3:0'),true);
+  assert.equal(completed.api.state().moves,49);
+  completed.click('col:3:0');
+  assert.equal(completed.api.state().won,true);
+
+  const missed=app(freeCellBeforeWin());
+  setAutoMoveTrigger(missed);
+  const miss=missed.startTouch(0,0,null);
+  miss.move(12);
+  assert.ok(missed.preview());
+  miss.release(12);
+  assert.equal(miss.click(),true);
+  assert.equal(missed.api.state().moves,48);
+  assert.equal(missed.get('hint-feedback').hidden,true);
+
+  const blockedGame=freeCellKingRun();
+  blockedGame.cols[2]=[c(1,'♦')];
+  const blocked=app(blockedGame);
+  setAutoMoveTrigger(blocked);
+  const blockedDrag=blocked.startTouch(0,0,'col:1');
+  blockedDrag.move(12);
+  assert.equal(blocked.preview(),undefined);
+  blockedDrag.release(12);
+  assert.equal(blockedDrag.click('col:2:0'),true);
+  assert.equal(blocked.api.state().moves,0);
+  blocked.click('col:2:0');
+  assert.equal(blocked.api.state().found[0].at(-1).id,c(1,'♦').id);
+});
+
+test('single-click tries the selected card at its intended destination before auto-moving the clicked card',()=>{
+  const g=engine.deal('freecell');
+  g.cols=[[c(7),c(6,'♥')],[c(8,'♦')],[],[],[],[],[],[]];
+  g.cells[0]=c(1);
+  g.found[0]=Array.from({length:7},(_,i)=>c(i+1,'♦'));
+  const h=app(g),table=h.get('board');
+  setAutoMoveTrigger(h);
+
+  h.click('col:0:0',0);
+  h.click('cell:0');
+  assert.equal(h.api.state().moves,0);
+  assert.equal(h.api.state().cells[0].id,c(1).id);
+  assert.match(table.innerHTML,/data-key="col:0:0"[^>]*aria-pressed="true"/);
+  assert.equal(h.get('hint-feedback').hidden,true);
+
+  h.click('col:1:0');
+  assert.deepEqual(Array.from(h.api.state().cols[1],card=>card.r),[8,7,6]);
+  assert.equal(h.api.state().found[0].length,7);
+  assert.equal(h.api.state().moves,1);
+});
+
+test('single-click falls back to selection and deselection when FreeCell has no automatic destination',()=>{
+  const g=engine.deal('freecell');
+  g.cols=[[c(7)],[],[],[],[],[],[],[]];
+  const h=app(g),table=h.get('board');
+  setAutoMoveTrigger(h);
+  const selected=/data-key="col:0:0"[^>]*aria-pressed="true"/;
+  h.click('col:0:0');
+  assert.match(table.innerHTML,selected);
+  h.click('col:0:0');
+  assert.doesNotMatch(table.innerHTML,selected);
+  assert.equal(h.api.state().moves,0);
+  assert.equal(h.get('hint-feedback').hidden,true);
+
+  h.click('col:0:0');
+  h.click('cell:0');
+  assert.equal(h.api.state().cells[0].id,c(7).id);
+  assert.equal(h.api.state().moves,1);
+});
+
+test('Klondike single-click keeps stock, placeholders and keyboard activation',()=>{
+  const g=board();
+  g.cols[0]=[c(1)];
+  g.cols[1]=[c(1,'♥')];
+  g.stock=[{...c(2),up:false}];
+  const h=app(g);
+  setAutoMoveTrigger(h);
+  h.click('found:0');
+  assert.equal(h.api.state().moves,g.moves);
+  h.click('col:0:0',0);
+  assert.equal(h.api.state().moves,g.moves);
+  h.document.emit('keydown',{key:'a',target:{tagName:'BUTTON'},preventDefault(){}});
+  assert.equal(h.api.state().found[0].at(-1).id,c(1).id);
+  h.click('col:1:0');
+  assert.equal(h.api.state().found[1].at(-1).id,c(1,'♥').id);
+  assert.equal(h.api.state().moves,g.moves+2);
+  h.click('stock');
+  h.click('stock');
+  assert.equal(h.api.state().stock.length,1);
+  assert.equal(h.api.state().moves,g.moves+4);
+});
+
+test('the same single-click preference works in Spider and Pyramid',()=>{
+  const stored=new Map();
+  const spider=engine.deal('spider');
+  spider.cols=[[c(7)],[c(8,'♥')],...Array.from({length:8},()=>[])];
+  const spiderApp=app(spider,stored);
+  setAutoMoveTrigger(spiderApp);
+  spiderApp.click('col:0:0');
+  assert.equal(spiderApp.api.state().cols[1].at(-1).id,c(7).id);
+
+  const pyramid=engine.deal('pyramid');
+  pyramid.cols=pyramid.cols.map(row=>row.map(()=>null));
+  pyramid.cols[6]=[c(5),c(8,'♥'),null,null,null,null,null];
+  const pyramidApp=app(pyramid,stored);
+  assert.equal(pyramidApp.get('auto-move-trigger').value,'single');
+  pyramidApp.click('p:6:0');
+  assert.equal(pyramidApp.api.state().cols[6][0],null);
+  assert.equal(pyramidApp.api.state().cols[6][1],null);
+  assert.equal(pyramidApp.api.state().moves,1);
+});
+
+test('the auto-fill setting is visible only for FreeCell',()=>{
+  const h=app(freeCellBeforeWin()),options=h.get('freecell-options');
+  assert.equal(options.hidden,false);
+  for (const mode of ['klondike','spider','pyramid','freecell']) {
+    h.get('modes').onclick({target:{dataset:{mode}}});
+    assert.equal(h.api.state().mode,mode);
+    assert.equal(options.hidden,mode!=='freecell');
+  }
+});
+
 test('FreeCell starts a new double-click after placing a card in a free cell',()=>{
   const g=engine.deal('freecell');
   g.cols=[[c(1)],[],[],[],[],[],[],[]];
@@ -499,7 +778,7 @@ test('FreeCell keeps the selected stack after repeated clicks on an occupied fre
 test('FreeCell blocks the four-card king run but lets the player drag the three-card tail',()=>{
   const h=app(freeCellKingRun());
   const instruction=h.get('message').textContent;
-  const king=h.startTouch(0,0,1);
+  const king=h.startTouch(0,0,'col:1');
   king.move(12);
   assert.equal(h.preview(),undefined);
   king.release(12);
@@ -507,14 +786,14 @@ test('FreeCell blocks the four-card king run but lets the player drag the three-
   assert.equal(h.get('message').textContent,instruction);
   assert.equal(h.api.state().moves,0);
 
-  const tap=h.startTouch(0,0,1);
+  const tap=h.startTouch(0,0,'col:1');
   tap.move(3);
   tap.release(3);
   assert.equal(tap.click(),false);
   assert.equal(h.get('message').textContent,instruction);
   assert.equal(h.get('hint-feedback').hidden,true);
 
-  const queen=h.startTouch(0,1,1);
+  const queen=h.startTouch(0,1,'col:1');
   queen.move(12);
   assert.equal(h.preview()?.children.length,3);
   queen.release(12);
@@ -528,7 +807,7 @@ test('FreeCell can lift the four-card king run with another empty column',()=>{
   const g=freeCellKingRun();
   g.cols[2]=[];
   const h=app(g);
-  const king=h.startTouch(0,0,1);
+  const king=h.startTouch(0,0,'col:1');
   king.move(12);
   assert.equal(h.preview()?.children.length,4);
   king.release(12);

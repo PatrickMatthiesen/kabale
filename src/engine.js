@@ -66,7 +66,22 @@ export function movesFrom(g, from) {
 }
 export function legalMoves(g){if(g.mode==='pyramid'){const k=[];for(let y=0;y<7;y++)for(let x=0;x<=y;x++)if(pyramidPlayable(g,y,x))k.push(`p:${y}:${x}`);if(g.pairWaste.length)k.push('pw');const a=[];for(const f of k){const c=f==='pw'?g.pairWaste.at(-1):g.cols[parts(f)[1]][parts(f)[2]];if(c.r===13)a.push({from:f,to:f,label:'Remove king'});for(const t of k)if(t!==f){const d=t==='pw'?g.pairWaste.at(-1):g.cols[parts(t)[1]][parts(t)[2]];if(c.r+d.r===13)a.push({from:f,to:t,label:'Pair to 13'});}}if(g.stock.length||g.pairWaste.length&&g.redealsLeft)a.push({from:'stock',to:'',label:'Deal'});return a;}
  const keys=[];g.cols.forEach((a,i)=>a.forEach((_,j)=>{if(runValid(a.slice(j),g.mode))keys.push(`col:${i}:${j}`)}));g.cells.forEach((c,i)=>{if(c)keys.push(`cell:${i}`)});if(g.waste.length)keys.push('waste');if(g.mode!=='spider')g.found.forEach((a,i)=>{if(a.length)keys.push(`found:${i}`)});const out=keys.flatMap(f=>movesFrom(g,f));if((g.mode==='klondike'&&(g.stock.length||g.waste.length))||(g.mode==='spider'&&g.stock.length>=10&&g.cols.every(c=>c.length)))out.push({from:'stock',to:'',label:'Deal'});return out;}
-function autoMoveFreeCell(g, key, source) {
+function cascadeFreeCellFoundations(g) {
+  const moveToFoundation = (card, from) => {
+    if (!card?.up) return false;
+    const index = g.found.findIndex(pile => fitsFoundation(pile, card));
+    return index !== -1 && applyMove(g, from, `found:${index}`);
+  };
+
+  // Each successful pass adds one card to a foundation and may expose another card.
+  while (!g.won) {
+    const moved = g.cols.some((column, i) => moveToFoundation(column.at(-1), `col:${i}`))
+      || g.cells.some((card, i) => moveToFoundation(card, `cell:${i}`));
+    if (!moved) break;
+  }
+}
+
+function autoMoveFreeCell(g, key, source, cascadeFoundations) {
   if (source.t === 'found') return false;
   const moves = movesFrom(g, key);
   const parent = source.a[source.i - 1];
@@ -84,15 +99,17 @@ function autoMoveFreeCell(g, key, source) {
     ?? moves.find(buildsOnColumn)
     ?? ((source.t === 'cell' || canUseEmptySpace) ? moves.find(move => targetColumn(move)?.length === 0) : null)
     ?? (canUseEmptySpace ? moves.find(move => move.to.startsWith('cell:')) : null);
-  return move ? applyMove(g, key, move.to) : false;
+  if (!move || !applyMove(g, key, move.to)) return false;
+  if (cascadeFoundations && move.to.startsWith('found:')) cascadeFreeCellFoundations(g);
+  return true;
 }
-export function autoMove(g,key) {
+export function autoMove(g,key,{cascadeFoundations=false}={}) {
   if (g.mode === 'pyramid') {
     return legalMoves(g).some(m => m.from === key && applyMove(g,key,m.to));
   }
   const source = seq(g,key);
   if (!source) return false;
-  if (g.mode === 'freecell') return autoMoveFreeCell(g,key,source);
+  if (g.mode === 'freecell') return autoMoveFreeCell(g,key,source,cascadeFoundations);
   const targets = [
     ...g.found.map((_,i) => `found:${i}`),
     ...g.cols.flatMap((a,i) => a.length ? [`col:${i}`] : []),
