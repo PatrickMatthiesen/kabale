@@ -69,6 +69,17 @@
 /* Keep recovery choices near the table without treating missing hints as a loss. */
 #end-dialog [hidden]{display:none}
 #end-dialog{max-height:calc(100svh - 24px);overflow:auto}#end-dialog::backdrop{background:#06140f66;backdrop-filter:blur(1px)}#end-dialog .dialog-card{padding:28px}#end-dialog h2{padding-right:16px}#end-dialog .end-stats{color:var(--gold);font:18px Georgia,serif}.end-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:22px}.end-buttons .tool-button{width:auto;min-height:44px;height:auto;padding:10px;border-color:#d9c48a40;font-size:14px;white-space:normal}.end-buttons .primary{color:#2f382a}.win-mark{display:none;width:68px;height:68px;margin:0 auto 18px;border:1px solid #d9bc7c80;border-radius:50%;background:#d9bc7c12;color:var(--gold)}.win-mark svg{width:44px;height:44px;fill:#173d31;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}#end-dialog[data-outcome="won"] .win-mark{display:grid;place-items:center;animation:win-arrive .35s ease-out}#end-dialog[data-outcome="won"] h2,#end-dialog[data-outcome="won"] p{text-align:center}@keyframes win-arrive{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}@media(max-width:720px){#end-dialog{width:calc(100% - 16px);margin:auto auto max(8px,env(safe-area-inset-bottom));border-radius:18px}#end-dialog .dialog-card{padding:24px 20px}}
+#end-dialog .end-win-time {
+  margin: 14px 0 0;
+  padding: 8px 12px;
+  border: 1px solid #d9c48a40;
+  border-radius: 8px;
+  background: #d9bc7c12;
+  color: var(--gold);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
 .hint-feedback {
   --toast-left: max(12px, env(safe-area-inset-left));
   --toast-right: max(12px, env(safe-area-inset-right));
