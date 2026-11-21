@@ -377,6 +377,7 @@ function action(fn, finishPlan = null) {
   if (g.difficulty !== 'hard') { past.push(before); if (past.length > 100) past.shift(); }
   if (g.difficulty !== 'hard') hintPositions.add(hintVisitKey(g));
   future = []; selected = null; hint = null; notice = '';
+  if (g.mode === 'freecell') lastClick = {key:'',time:0};
   if (g.won) elapsed += Date.now() - resumedAt;
   updateClock(); save();
   if (g.won) {
@@ -396,6 +397,10 @@ function choose(key, automatic = false) {
       notice=tr('Fill every empty column before dealing from the stock.'); render(); return;
     }
     action(() => applyMove(g,'stock','stock')); return;
+  }
+  if (g.mode === 'freecell' && selected && key !== selected && key?.startsWith('cell:')) {
+    if (!action(() => applyMove(g,selected,key))) lastClick = {key:'',time:0};
+    return;
   }
   if (automatic) { action(() => autoMove(g,key)); return; }
   if (g.mode === 'pyramid' && legalMoves(g).some(m => m.from === key && m.to === key)) { action(() => applyMove(g,key,key)); return; }

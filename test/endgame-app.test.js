@@ -43,7 +43,7 @@ function eventTarget() {
 function app(game,stored=new Map(),motionFactory=createCardMotion) {
   if(game)stored.set('kabale-session-v3',JSON.stringify({version:3,game,initial:game,past:[],future:[],elapsed:120000}));
   const elements=new Map();
-  let preview, pointerTarget;
+  let preview, pointerTarget, clickTime=0;
   const document={activeElement:null,addEventListener(){},
     body:{classList:{add(){},remove(){}},append(element){preview=element;}},
     elementFromPoint:()=>pointerTarget,querySelector:()=>[...elements.values()].find(e=>e.open)??null};
@@ -56,10 +56,14 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
   document.createElement=()=>({...el(),children:[],append(child){this.children.push(child);},remove(){if(preview===this) preview=undefined;}});
   const window={...eventTarget(),localStorage:{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v)},devicePixelRatio:1,innerHeight:1000,scrollY:0};
   const context={...engine,...art,...hints,...settings,...i18n,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,planKlondikeHint,rememberStock,restoreStockMemory,createCardMotion:motionFactory,document,
-    window,performance,
+    window,performance:{now:()=>clickTime+=100},
     getComputedStyle:()=>({paddingLeft:'8px',paddingRight:'8px'}),ResizeObserver:class{observe(){}},confirm:()=>true,
     setTimeout:()=>1,clearTimeout(){},setInterval(){},Date,console,structuredClone};
   vm.runInNewContext(dragSource+'\n'+source+';globalThis.api={state:()=>g,past:()=>past,choose,flush:saveNow};',context);
+  function click(key) {
+    const target={dataset:{key},closest:()=>target};
+    document.getElementById('board').emit('click',{target,detail:1});
+  }
   function startTouch(column,index,destination) {
     const board=document.getElementById('board');
     const pile={querySelectorAll:()=>cards};
@@ -82,7 +86,7 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
       }
     };
   }
-  return {get:id=>document.getElementById(id),api:context.api,stored,startTouch,preview:()=>preview,window};
+  return {get:id=>document.getElementById(id),api:context.api,stored,click,startTouch,preview:()=>preview,window};
 }
 
 test('real app finishes, saves final time/moves, and can undo the complete cleanup',()=>{
@@ -251,6 +255,54 @@ function freeCellKingRun() {
   g.cells=[null,null,c(2),c(2,'♥')];
   return g;
 }
+
+test('FreeCell starts a new double-click after placing a card in a free cell',()=>{
+  const g=engine.deal('freecell');
+  g.cols=[[c(1)],[],[],[],[],[],[],[]];
+  const h=app(g);
+
+  h.click('col:0:0');
+  h.click('cell:0');
+  assert.equal(h.api.state().moves,1);
+
+  h.click('cell:0');
+  assert.equal(h.api.state().cells[0]?.id,c(1).id);
+  assert.equal(h.api.state().moves,1);
+  assert.match(h.get('board').innerHTML,/data-key="cell:0"[^>]*aria-pressed="true"/);
+
+  h.click('cell:0');
+  assert.equal(h.api.state().cells[0],null);
+  assert.equal(h.api.state().found[0].at(-1)?.id,c(1).id);
+  assert.equal(h.api.state().moves,2);
+});
+
+test('FreeCell keeps the selected stack after repeated clicks on an occupied free cell',()=>{
+  const g=engine.deal('freecell');
+  g.cols=[[c(7),c(6,'♥')],[c(8,'♥')],[],[],[],[],[],[]];
+  g.cells[0]=c(1);
+  const h=app(g);
+  const rejection='That move is not available. Choose another card or destination.';
+
+  h.click('col:0:0');
+  for (let i=0;i<2;i++) {
+    h.click('cell:0');
+    assert.equal(h.api.state().moves,0);
+    assert.equal(h.get('hint-feedback').hidden,false);
+    assert.equal(h.get('hint-feedback-text').textContent,rejection);
+    assert.match(h.get('board').innerHTML,/data-key="col:0:0"[^>]*aria-pressed="true"/);
+  }
+
+  h.click('col:1:0');
+  assert.deepEqual(Array.from(h.api.state().cols[1],card=>card.r),[8,7,6]);
+  assert.equal(h.api.state().moves,1);
+
+  h.click('cell:0');
+  assert.match(h.get('board').innerHTML,/data-key="cell:0"[^>]*aria-pressed="true"/);
+  h.click('cell:0');
+  assert.equal(h.api.state().cells[0],null);
+  assert.equal(h.api.state().found[0].at(-1)?.id,c(1).id);
+  assert.equal(h.api.state().moves,2);
+});
 
 test('FreeCell blocks the four-card king run but lets the player drag the three-card tail',()=>{
   const h=app(freeCellKingRun());

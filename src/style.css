@@ -227,6 +227,19 @@
   flex-direction: column;
 }
 #board[data-side-reserves="true"] .reserve-group > .pile { flex: none; }
+#board[data-mode="freecell"][data-side-reserves="true"] .reserve-group > .pile.drop-target { outline: none; }
+#board[data-mode="freecell"][data-side-reserves="true"] .reserve-group > .pile.drop-target::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 2px dashed #85ddd2;
+  border-radius: inherit;
+  pointer-events: none;
+}
+#board[data-mode="freecell"][data-side-reserves="true"] .reserve-group > .pile.drop-hover::after {
+  border: 3px solid #b8f6db;
+}
 #board[data-side-reserves="true"] .reserve-start { grid-area: start; }
 #board[data-side-reserves="true"] .reserve-end { grid-area: end; }
 #board[data-side-reserves="true"] .tableau { grid-area: tableau; }
