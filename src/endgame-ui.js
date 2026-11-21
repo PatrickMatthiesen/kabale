@@ -2,6 +2,25 @@ import { gameOutcome, completionPlan } from './endgame.js';
 import { hintPosition } from './hints.js';
 import { translate } from './i18n.js';
 
+export function formatTime(seconds) {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const remainder = (seconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${remainder}`;
+}
+
+function winTimeSummary({ seconds, previousSeconds, bestSeconds, isNewBest }, tr) {
+  const lines = [];
+  if (isNewBest) lines.push(tr('New best time'));
+  lines.push(tr('Personal best: {time}', {time:formatTime(bestSeconds)}));
+  if (previousSeconds !== null) {
+    const difference = seconds - previousSeconds;
+    if (difference === 0) lines.push(tr('Same time as the previous win'));
+    else lines.push(tr(difference < 0 ? '{time} faster than the previous win' : '{time} slower than the previous win',
+      {time:formatTime(Math.abs(difference))}));
+  }
+  return lines.join('\n');
+}
+
 /** End notices are advisory. Dismissing one never changes the deal. */
 export function attachEndgameUI({ elements: e, seen, onSeen, onUndo, onRestart, onNew, onFinish }) {
   let game, outcome, plan, cachedGame, cachedMoves, cachedLanguage, cachedCanUndo, previousFocus;
@@ -19,7 +38,7 @@ export function attachEndgameUI({ elements: e, seen, onSeen, onUndo, onRestart, 
   e.newDeal.onclick=()=>{if(onNew()) close();};
   e.finish.onclick=()=>{if(plan?.length) onFinish(plan);};
   return {
-    update(current, { canUndo, time, deferResult = false, newWin = false, language = 'en' }) {
+    update(current, { canUndo, time, deferResult = false, newWin = false, language = 'en', winResult }) {
       game=current;
       const tr = (text,values) => translate(language,text,values);
       const moved = cachedGame!==game || cachedMoves!==game.moves;
@@ -38,6 +57,9 @@ export function attachEndgameUI({ elements: e, seen, onSeen, onUndo, onRestart, 
       e.message.textContent=outcome.message;
       e.stats.hidden=outcome.kind!=='won';
       e.stats.textContent=`${time} · ${tr(game.moves===1?'{count} move':'{count} moves',{count:game.moves})}`;
+      const showWinTime = outcome.kind === 'won' && winResult != null;
+      e.winTime.hidden = !showWinTime;
+      e.winTime.textContent = showWinTime ? winTimeSummary(winResult, tr) : '';
       e.undo.hidden=outcome.kind==='won'||game.difficulty==='hard';
       e.undo.disabled=!canUndo;
       e.newDeal.classList.toggle('primary', outcome.kind==='won'||game.difficulty==='hard'||!canUndo);

@@ -12,9 +12,10 @@ import * as i18n from '../src/i18n.js';
 import {wasteLayout} from '../src/waste-layout.js';
 import {boardLayout} from '../src/board-layout.js';
 import {gameRules} from '../src/game-rules.js';
-import {attachEndgameUI} from '../src/endgame-ui.js';
+import {attachEndgameUI,formatTime} from '../src/endgame-ui.js';
 import {createCardMotion} from '../src/card-motion.js';
 import {cardTransfers} from '../src/card-transfers.js';
+import {createWinTracker} from '../src/win-times.js';
 
 const source=(await readFile(new URL('../src/app.js',import.meta.url),'utf8')).replace(/^import .*\r?\n/gm,'');
 const dragSource=(await readFile(new URL('../src/card-drag.js',import.meta.url),'utf8')).replace('export function attachCardDrag','function attachCardDrag');
@@ -41,7 +42,7 @@ function eventTarget() {
     }
   };
 }
-function app(game,stored=new Map(),motionFactory=createCardMotion) {
+function app(game,stored=new Map(),motionFactory=createCardMotion,now=Date.now) {
   if(game)stored.set('kabale-session-v3',JSON.stringify({version:3,game,initial:game,past:[],future:[],elapsed:120000}));
   const elements=new Map(),timers=new Map();
   let preview, pointerTarget, clickTime=0, nextTimer=0;
@@ -56,11 +57,11 @@ function app(game,stored=new Map(),motionFactory=createCardMotion) {
   document.getElementById=id=>{if(!elements.has(id))elements.set(id,el(id));return elements.get(id);};
   document.createElement=()=>({...el(),children:[],append(child){this.children.push(child);},remove(){if(preview===this) preview=undefined;}});
   const window={...eventTarget(),localStorage:{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v)},devicePixelRatio:1,innerHeight:1000,scrollY:0};
-  const context={...engine,...art,...hints,...settings,...i18n,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,selectHelpHint,rememberStock,restoreStockMemory,cardTransfers,createCardMotion:motionFactory,document,
-    window,performance:{now:()=>clickTime+=100},
+  const context={...engine,...art,...hints,...settings,...i18n,getHintRole:hints.hintRole,wasteLayout,boardLayout,gameRules,attachEndgameUI,formatTime,createWinTracker,selectHelpHint,rememberStock,restoreStockMemory,cardTransfers,createCardMotion:motionFactory,document,
+    window,crypto,performance:{now:()=>clickTime+=100},
     getComputedStyle:()=>({paddingLeft:'8px',paddingRight:'8px'}),ResizeObserver:class{observe(){}},confirm:()=>true,
     setTimeout(callback,delay){timers.set(++nextTimer,{callback,delay});return nextTimer;},
-    clearTimeout:id=>timers.delete(id),setInterval(){},Date,console,structuredClone};
+    clearTimeout:id=>timers.delete(id),setInterval(){},Date:class extends Date {static now(){return now();}},console,structuredClone};
   vm.runInNewContext(dragSource+'\n'+source+';globalThis.api={state:()=>g,past:()=>past,choose,flush:saveNow};',context);
   function clickTarget(key) {
     const html=document.getElementById('board').innerHTML;
@@ -762,6 +763,122 @@ function freeCellBeforeWin() {
   g.moves=48;
   return g;
 }
+
+test('win time is saved on the first win and compared after an explicit replay',()=>{
+  const g=freeCellBeforeWin(), stored=new Map(), historyKey='kabale-win-times';
+  let time=1000000, historyWrites=0;
+  const now=()=>time;
+  stored.set=(key,value)=>{
+    if (key===historyKey) historyWrites++;
+    return Map.prototype.set.call(stored,key,value);
+  };
+  const session=()=>JSON.parse(stored.get('kabale-session-v3'));
+  const h=app(g,stored,createCardMotion,now);
+  for (let i=0;i<3;i++) {
+    h.click(`col:${i}:0`,0);
+    h.click(`found:${i}`,0);
+  }
+  assert.equal(h.api.state().won,false);
+  assert.equal(historyWrites,0);
+
+  time+=3456;
+  h.click('cell:0',0);
+  h.click('found:3',0);
+  const first={seconds:123,previousSeconds:null,bestSeconds:123,isNewBest:true};
+  assert.equal(session().game.won,true);
+  assert.deepEqual(session().winResult,first);
+  assert.equal(historyWrites,1);
+  assert.equal(h.get('end-win-time').hidden,false);
+  const summary=h.get('end-win-time').textContent;
+  assert.ok(summary.includes(formatTime(first.bestSeconds)));
+
+  h.get('end-keep').onclick();
+  h.window.emit('pagehide',{});
+  time+=10000;
+  const restored=app(null,stored,createCardMotion,now);
+  assert.equal(restored.get('end-dialog').open,false);
+  restored.get('end-review').onclick();
+  assert.equal(restored.get('end-dialog').open,true);
+  assert.equal(restored.get('end-win-time').textContent,summary);
+  restored.get('end-keep').onclick();
+
+  restored.get('undo').onclick();
+  assert.equal(restored.api.state().won,false);
+  assert.equal(restored.get('end-win-time').hidden,true);
+  restored.get('redo').onclick();
+  assert.equal(restored.api.state().won,true);
+  assert.equal(restored.get('end-win-time').textContent,summary);
+  restored.get('undo').onclick();
+  restored.window.emit('pagehide',{});
+  assert.deepEqual(session().winResult,first);
+  assert.equal(historyWrites,1);
+
+  const resumed=app(null,stored,createCardMotion,now);
+  time+=5000;
+  resumed.click('cell:0',0);
+  resumed.click('found:3',0);
+  assert.equal(session().game.won,true);
+  assert.deepEqual(session().winResult,first);
+  assert.equal(historyWrites,1);
+
+  resumed.get('end-restart').onclick();
+  resumed.window.emit('pagehide',{});
+  assert.deepEqual(session().game,g);
+  assert.equal(session().winResult ?? null,null);
+  assert.equal(historyWrites,1);
+
+  time+=130000;
+  resumed.get('finish-game').onclick();
+  assert.equal(session().game.won,true);
+  assert.deepEqual(session().winResult,{seconds:130,previousSeconds:123,bestSeconds:123,isNewBest:false});
+  assert.equal(historyWrites,2);
+
+  resumed.get('end-new').onclick();
+  resumed.window.emit('pagehide',{});
+  assert.equal(session().game.moves,0);
+  assert.equal(session().winResult ?? null,null);
+  assert.equal(historyWrites,2);
+});
+
+test('a saved win from before win times displays without recording a result',()=>{
+  const g=freeCellBeforeWin();
+  for (let i=0;i<3;i++) assert.equal(engine.applyMove(g,`col:${i}:0`,`found:${i}`),true);
+  assert.equal(engine.applyMove(g,'cell:0','found:3'),true);
+  const h=app(g);
+  assert.equal(h.api.state().won,true);
+  assert.equal(h.get('end-dialog').open,true);
+  assert.equal(h.get('end-win-time').hidden,true);
+  h.get('end-keep').onclick();
+  h.get('end-review').onclick();
+  h.window.emit('pagehide',{});
+  const session=JSON.parse(h.stored.get('kabale-session-v3'));
+  assert.equal(session.winResult ?? null,null);
+  assert.equal(h.stored.has('kabale-win-times'),false);
+});
+
+test('two tabs finishing the same saved attempt keep the original win time',()=>{
+  const game=freeCellBeforeWin(), stored=new Map();
+  let time=1000000;
+  const now=()=>time;
+  const first=app(game,stored,createCardMotion,now);
+  const session=()=>JSON.parse(stored.get('kabale-session-v3'));
+  const attemptId=session().attemptId;
+  assert.ok(attemptId);
+  const second=app(null,stored,createCardMotion,now);
+  time+=4000;
+  first.get('finish-game').onclick();
+  const result=session().winResult;
+  assert.deepEqual(result,{seconds:124,previousSeconds:null,bestSeconds:124,isNewBest:true});
+  time+=6000;
+  second.get('finish-game').onclick();
+  assert.equal(session().attemptId,attemptId);
+  assert.deepEqual(session().winResult,result);
+  assert.equal(second.get('time').textContent,'02:04');
+
+  second.get('end-restart').onclick();
+  second.api.flush();
+  assert.notEqual(session().attemptId,attemptId);
+});
 
 test('FreeCell defaults to auto-fill in a saved game and treats the entire win as one action',()=>{
   const g=freeCellBeforeWin(),h=app(g);

@@ -10,14 +10,16 @@ import { loadEmptyColumns, saveEmptyColumns, cardIndexScales, loadCardIndexSize,
 import { loadFreeCellAutoFill, saveFreeCellAutoFill, loadAutoMoveTrigger, saveAutoMoveTrigger } from './game-settings.js';
 import { loadCardAnimations, saveCardAnimations } from './game-settings.js';
 import { gameRules } from './game-rules.js';
-import { attachEndgameUI } from './endgame-ui.js';
+import { attachEndgameUI, formatTime } from './endgame-ui.js';
 import { createCardMotion } from './card-motion.js';
 import { cardTransfers } from './card-transfers.js';
 import { attachFullscreen } from './fullscreen.js';
 import { bindDocumentLanguage, loadLanguage, saveLanguage, translate } from './i18n.js';
+import { createWinTracker } from './win-times.js';
 import './register-cache.js';
 
 const storage = getStorage(window);
+const winTracker = createWinTracker(storage);
 const art = loadArt(storage);
 saveArt(storage,art);
 let emptyColumns = loadEmptyColumns(storage);
@@ -35,6 +37,8 @@ const storageKey = 'kabale-session-v3';
 let g = deal('klondike', 'normal', { emptyColumns });
 let initial = structuredClone(g), past = [], future = [], selected = null, hint = null;
 let elapsed = 0, resumedAt = Date.now(), announcement = '', lastClick = { key: '', time: 0 };
+let attemptId = crypto.randomUUID(), needsAttemptId = false;
+let winResult = null;
 let hintFeedback = '';
 let warning = null;
 let dragging = false;
@@ -47,6 +51,9 @@ try {
     past = g.difficulty === 'hard' ? [] : (saved.past || []).slice(-100);
     future = g.difficulty === 'hard' ? [] : (saved.future || []).slice(-100);
     elapsed = Number.isFinite(saved.elapsed) ? saved.elapsed : 0;
+    if (typeof saved.attemptId === 'string' && saved.attemptId) attemptId = saved.attemptId;
+    else needsAttemptId = true;
+    winResult = saved.winResult ?? null;
     seenEndNotices = new Set(Array.isArray(saved.seenEndNotices) ? saved.seenEndNotices.filter(k=>typeof k==='string') : []);
   }
 } catch { setWarning('Your saved game could not be loaded. A fresh table is ready.'); }
@@ -128,7 +135,7 @@ const suitNames = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 
 const clock = () => elapsed + (g.won ? 0 : Date.now() - resumedAt);
 function saveNow() {
   clearTimeout(saveTimer);
-  try { storage.setItem(storageKey, JSON.stringify({version: 3, game: g, initial, past, future, elapsed: clock(), seenEndNotices:[...seenEndNotices]})); }
+  try { storage.setItem(storageKey, JSON.stringify({version: 3, game: g, initial, past, future, elapsed: clock(), attemptId, winResult, seenEndNotices:[...seenEndNotices]})); }
   catch {
     setWarning('Browser storage is unavailable. Keep this tab open to retain your game.');
     renderFeedback();
@@ -389,7 +396,7 @@ board.addEventListener('scroll',() => {
   placeFeedback();
 },{passive:true});
 function updateEndgame(newWin = false) {
-  endgameUI?.update(g,{canUndo:past.length>0,time:$('time').textContent,deferResult:celebrating,newWin,language});
+  endgameUI?.update(g,{canUndo:past.length>0,time:$('time').textContent,deferResult:celebrating,newWin,language,winResult});
 }
 function celebrate(previous, {before, drop} = {}) {
   const winner = g;
@@ -468,14 +475,18 @@ function action(fn, {finishPlan, quiet, drop} = {}) {
   if (g.difficulty !== 'hard') hintPositions.add(hintVisitKey(g));
   future = []; selected = null; hint = null; hintFeedback = ''; announcement = '';
   if (g.mode === 'freecell') lastClick = {key:'',time:0};
-  if (g.won) elapsed += Date.now() - resumedAt;
-  updateClock(); save();
-  if (g.won) {
-    cancelDrag();
-    const previous = motion.capture();
-    if (finishPlan && motion.enabled()) void playFinish(structuredClone(before),finishPlan,previous);
-    else celebrate(previous,{before,drop});
-  } else render({before,drop});
+  if (!g.won) {
+    updateClock(); save(); render({before,drop});
+    return true;
+  }
+  const completedAt = Date.now();
+  elapsed += completedAt - resumedAt;
+  winResult ??= winTracker.recordWin(g, elapsedSeconds(), {attemptId, completedAt});
+  updateClock(); saveNow();
+  cancelDrag();
+  const previous = motion.capture();
+  if (finishPlan && motion.enabled()) void playFinish(structuredClone(before),finishPlan,previous);
+  else celebrate(previous,{before,drop});
   return true;
 }
 function choose(key, {autoTrigger, cascadeFoundations = false} = {}) {
@@ -537,7 +548,7 @@ function undo(redo = false) {
   const before = g;
   elapsed = clock(); to.push(structuredClone(before)); g = from.pop(); selected = null; hint = null; announcement = tr(redo ? 'Move restored.' : 'Move undone.');
   hintPositions = new Set([...past,g].map(hintVisitKey));
-  resumedAt = Date.now(); save(); render({before});
+  resumedAt = Date.now(); updateClock(); save(); render({before});
 }
 function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyRule = emptyColumns, animate = false) {
   if (finishPlayback) return false;
@@ -552,6 +563,8 @@ function fresh(mode = g.mode, difficulty = g.difficulty, restart = false, emptyR
   saveEmptyColumns(storage,emptyColumns);
   if (!restart) { art.resolved = resolveArt(art.choice); saveArt(storage, art); }
   initial = structuredClone(g); past = []; future = []; selected = null; hint = null; elapsed = 0; resumedAt = Date.now(); announcement = '';
+  attemptId = crypto.randomUUID();
+  winResult = null;
   hintPositions = new Set([hintVisitKey(g)]);
   hintFeedback='';
   seenEndNotices.clear(); endgameUI?.reset();
@@ -695,9 +708,13 @@ window.addEventListener('scroll', () => {
   else motion.cancel();
   placeFeedback();
 },{passive:true});
-function updateClock(){ const seconds=Math.floor(clock()/1000); $('time').textContent=`${Math.floor(seconds/60).toString().padStart(2,'0')}:${(seconds%60).toString().padStart(2,'0')}`; }
+function elapsedSeconds() { return Math.max(0, Math.floor(clock()/1000)); }
+function updateClock() {
+  const seconds = g.won && winResult ? winResult.seconds : elapsedSeconds();
+  $('time').textContent = formatTime(seconds);
+}
 endgameUI=attachEndgameUI({
-  elements:Object.fromEntries(Object.entries({dialog:'end-dialog',actions:'end-actions',summary:'end-summary',finish:'finish-game',review:'end-review',close:'end-close',keep:'end-keep',undo:'end-undo',restart:'end-restart',newDeal:'end-new',title:'end-title',message:'end-message',stats:'end-stats'}).map(([key,id])=>[key,$(id)])),
+  elements:Object.fromEntries(Object.entries({dialog:'end-dialog',actions:'end-actions',summary:'end-summary',finish:'finish-game',review:'end-review',close:'end-close',keep:'end-keep',undo:'end-undo',restart:'end-restart',newDeal:'end-new',title:'end-title',message:'end-message',stats:'end-stats',winTime:'end-win-time'}).map(([key,id])=>[key,$(id)])),
   seen:seenEndNotices, onSeen:save, onUndo:()=>undo(),
   onRestart:()=>fresh(g.mode,g.difficulty,true), onNew:newDeal,
   onFinish:plan=>action(()=>{
@@ -719,3 +736,4 @@ const fullscreen = document.documentElement ? attachFullscreen(document.document
 applyLanguage();
 document.documentElement?.style.setProperty('--card-index-scale',cardIndexScales[indexSize]);
 setInterval(updateClock,1000); updateClock(); render();
+if (needsAttemptId) saveNow();
