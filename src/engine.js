@@ -88,7 +88,7 @@ function autoMoveFreeCell(g, key, source, cascadeFoundations) {
   const foundationReady = card => card?.up && g.found.some(pile => fitsFoundation(pile, card));
   const uncoversFoundationCard = foundationReady(parent);
   const canUseEmptySpace = uncoversFoundationCard ||
-    (source.t === 'col' && source.i > 0 && source.c.length === 1);
+    (source.t === 'col' && source.i > 0);
   const targetColumn = ({to}) => to.startsWith('col:') ? g.cols[parts(to)[1]] : undefined;
   const hasEquivalentParent = top => parent && top.r === parent.r && red(top) === red(parent);
   const buildsOnColumn = move => {
