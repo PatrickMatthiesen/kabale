@@ -128,6 +128,59 @@ test('moving a whole column to another empty slot or a cell to another cell is n
   assert.notDeepEqual(hint,{from:'cell:0',to:'cell:1',label:'Move to free cell'});
 });
 
+function reportedFreeCellPosition() {
+  const game=table('freecell');
+  const suits={S:'♠',H:'♥',D:'♦',C:'♣'};
+  const ranks='A23456789TJQK';
+  const parseCard=id=>card(ranks.indexOf(id[1])+1,suits[id[0]],id);
+  game.cols=[
+    'D4 DQ H3 CQ SJ C3 C8 H7 C6 D5 C4',
+    'HA S7 S5 HT D2',
+    'DJ CK C9 H6 C5',
+    'DK CJ S8 D6',
+    'D3 S3 SK DA D8 CT H9',
+    'D9 HQ H2 SQ HJ HK',
+    'ST S6 H5',
+    'H8 S2 H4 D7 S4 DT S9'
+  ].map(pile=>pile.split(' ').map(parseCard));
+  game.cells=[null,parseCard('C7'),null,null];
+  game.found=[[parseCard('SA')],['CA','C2'].map(parseCard),[],[]];
+  return game;
+}
+
+test('FreeCell hints skip parking when a direct move frees a shorter run', () => {
+  const game=reportedFreeCellPosition();
+  const parked=structuredClone(game);
+  assert.ok(applyMove(parked,'col:0:10','cell:0'));
+  assert.ok(applyMove(parked,'cell:0','col:6'));
+
+  const followUp={from:'col:0:6',to:'col:4',label:'Move to tableau'};
+  const before=hintVisitKey(game);
+  assert.ok(!applyMove(game,followUp.from,followUp.to),'the five-card run exceeds the move capacity');
+  const hint=selectHint(game);
+  assert.deepEqual(hint,{from:'col:0:10',to:'col:6',label:'Move to tableau'});
+  assert.ok(applyMove(game,hint.from,hint.to));
+  assert.equal(hintPosition(game),hintPosition(parked));
+  assert.deepEqual(selectHint(game,new Set([before])),followUp);
+});
+
+test('FreeCell keeps an equivalent swap below parking when it frees no useful move', () => {
+  const game=table('freecell');
+  game.cols=[[card(5,'♦','D5'),card(4,'♣','C4')],[card(5,'♥','H5')]];
+  game.cells=[null,null,null,null];
+  assert.ok(legalMoves(game).some(move=>move.from==='col:0:1' && move.to==='col:1'));
+  assert.deepEqual(selectHint(game),{from:'col:0:1',to:'cell:0',label:'Move to free cell'});
+});
+
+test('FreeCell keeps an equivalent swap below parking when the follow-up revisits a position', () => {
+  const game=reportedFreeCellPosition();
+  const followUp=structuredClone(game);
+  assert.ok(applyMove(followUp,'col:0:10','col:6'));
+  assert.ok(applyMove(followUp,'col:0:6','col:4'));
+  assert.deepEqual(selectHint(game,new Set([hintVisitKey(followUp)])),
+    {from:'col:0:10',to:'cell:0',label:'Move to free cell'});
+});
+
 test('hint selection is legal, non-mutating, and independent of hidden values in every game', () => {
   for(const mode of ['klondike','spider','freecell','pyramid']) {
     const game=deal(mode);
