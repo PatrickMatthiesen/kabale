@@ -30,6 +30,7 @@ for (const [file, content] of sources) {
   await writeFile(`_site/src/${file}`, published);
 }
 await copyFile('sw.js', '_site/sw.js');
+await copyFile('favicon.svg', '_site/favicon.svg');
 for (const [directory, extensions] of [['assets/cards/optimized', ['.webp']]]) {
   await mkdir(`_site/${directory}`, { recursive: true });
   for (const file of await readdir(directory)) {
